@@ -27,7 +27,7 @@
 - **Race Countdown** - Live timer to next race event
 
 ### 🔐 For Admins
-- **Race Control Center** - Comprehensive admin panel at `/Nevada`
+- **Race Control Center** - Comprehensive admin panel
 - **Create Betting Markets** - Set up new betting opportunities
 - **User Management** - View, ban, and manage all users
 - **Betting Controls** - Open/close betting globally
@@ -92,11 +92,11 @@ polaris-motogp-app/
 │   │   ├── betting/       # Betting arena
 │   │   ├── dashboard/     # User dashboard
 │   │   ├── leaderboard/   # Rankings
-│   │   ├── Nevada/        # Admin panel
+│   │   ├── admin/         # Admin panel
 │   │   └── victory/       # Victory podium
 │   ├── auth/              # Sign in/up
 │   ├── landing/           # Public landing
-│   └── Nevada-auth/       # Admin login
+│   └── admin-auth/        # Admin login
 ├── components/            # Reusable components
 ├── hooks/                 # Custom React hooks
 ├── lib/                   # Utilities & Firebase
@@ -282,8 +282,8 @@ npm run build
 
 ### Admin Access Issues
 
-- Verify email: `Wulo@gmail.com`
 - Check Firebase Authentication
+- Verify admin permissions
 - Clear browser cache
 
 ---

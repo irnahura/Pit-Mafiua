@@ -70,11 +70,11 @@ Pit-Mafiua/
     │   │   ├── betting/
     │   │   ├── dashboard/
     │   │   ├── leaderboard/
-    │   │   ├── Nevada/            # Admin panel
+    │   │   ├── admin/             # Admin panel
     │   │   └── victory/
     │   ├── auth/                  # Authentication
     │   ├── landing/               # Landing page
-    │   ├── Nevada-auth/           # Admin login
+    │   ├── admin-auth/            # Admin login
     │   ├── layout.tsx
     │   ├── page.tsx
     │   └── globals.css
