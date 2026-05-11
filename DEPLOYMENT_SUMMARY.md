@@ -159,26 +159,6 @@ CMD ["npm", "start"]
 ```
 
 ---
-
-## 🔐 Admin Access
-
-### Credentials
-- **Email:** `Wulo@gmail.com`
-- **Password:** `Luadrahotum`
-
-### Routes
-- **Admin Login:** `/Nevada-auth`
-- **Admin Panel:** `/Nevada`
-
-### Features
-- Create betting markets
-- Manage users (ban/unban)
-- Control betting status
-- View analytics
-- Monitor system logs
-
----
-
 ## 📚 Documentation Links
 
 ### Main Documentation
