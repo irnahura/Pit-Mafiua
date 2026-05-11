@@ -199,42 +199,6 @@ See [PROJECT_DOCUMENTATION.md](PROJECT_DOCUMENTATION.md) for detailed schemas.
 4. View your position
 
 ---
-
-## 🔐 Admin Guide
-
-### Access Admin Panel
-
-1. Navigate to `/Nevada-auth`
-2. Sign in with admin credentials:
-   - **Email:** `Wulo@gmail.com`
-   - **Password:** `Luadrahotum`
-3. Redirected to `/Nevada`
-
-### Create Betting Market
-
-1. Fill "Create Bet" form:
-   - Bet Name
-   - Summary
-   - Start Time
-   - Duration
-2. Click "CREATE BET"
-
-### Manage Users
-
-- View all active bettors
-- Search by email or UID
-- Ban/unban users
-- Monitor balances and stakes
-
-### Control Betting
-
-- **CLOSE BETS** - Lock all markets
-- **OPEN BETS** - Unlock markets
-
-See [PROJECT_DOCUMENTATION.md](PROJECT_DOCUMENTATION.md) for complete admin guide.
-
----
-
 ## 🚢 Deployment
 
 ### Build for Production
