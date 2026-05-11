@@ -122,19 +122,6 @@ NEXT_PUBLIC_FIREBASE_APP_ID=your_app_id
 - PitCoin to voucher conversion
 - Animated confetti effects
 - Redemption instructions
-
-### 7. Admin Panel (Nevada)
-- **Route:** `/Nevada`
-- **Access:** Admin-only (`Wulo@gmail.com`)
-- **Features:**
-  - Real-time analytics dashboard
-  - Create new betting markets
-  - View all active bettors
-  - Ban/unban users
-  - Open/close betting globally
-  - System teletype with logs
-  - Global odds distribution chart
-
 ---
 
 ## Tech Stack
