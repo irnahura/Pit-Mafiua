@@ -44,6 +44,9 @@ export default function RaceControlAdmin() {
   const [summary, setSummary] = useState("");
   const [startTime, setStartTime] = useState("");
   const [duration, setDuration] = useState("1h");
+  const [icon, setIcon] = useState("trophy");
+  const [color, setColor] = useState("primary");
+  const [odds, setOdds] = useState("2.5");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -88,6 +91,9 @@ export default function RaceControlAdmin() {
         startTime,
         duration,
         raceEvent: "MotoGP 2026",
+        icon,
+        color,
+        odds: parseFloat(odds),
       });
 
       alert("Betting market created successfully!");
@@ -95,6 +101,9 @@ export default function RaceControlAdmin() {
       setSummary("");
       setStartTime("");
       setDuration("1h");
+      setIcon("trophy");
+      setColor("primary");
+      setOdds("2.5");
       loadAdminData();
     } catch (error) {
       alert("Error creating betting market");
@@ -359,6 +368,56 @@ export default function RaceControlAdmin() {
                       <option value="4h">4 Hours</option>
                       <option value="race">Until Race End</option>
                     </select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <label className="font-mono text-[12px] text-on-surface-variant uppercase">
+                      Icon
+                    </label>
+                    <select
+                      value={icon}
+                      onChange={(e) => setIcon(e.target.value)}
+                      className="w-full bg-surface-container-lowest border border-outline-variant/50 rounded-lg px-4 py-3 font-mono text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
+                    >
+                      <option value="trophy">Trophy</option>
+                      <option value="timer">Timer</option>
+                      <option value="alert">Alert</option>
+                      <option value="gauge">Gauge</option>
+                      <option value="car">Car</option>
+                      <option value="target">Target</option>
+                      <option value="zap">Zap</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="font-mono text-[12px] text-on-surface-variant uppercase">
+                      Color
+                    </label>
+                    <select
+                      value={color}
+                      onChange={(e) => setColor(e.target.value)}
+                      className="w-full bg-surface-container-lowest border border-outline-variant/50 rounded-lg px-4 py-3 font-mono text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
+                    >
+                      <option value="primary">Pink</option>
+                      <option value="tertiary">Cyan</option>
+                      <option value="error">Red</option>
+                      <option value="secondary">Green</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="font-mono text-[12px] text-on-surface-variant uppercase">
+                      Odds
+                    </label>
+                    <input
+                      value={odds}
+                      onChange={(e) => setOdds(e.target.value)}
+                      className="w-full bg-surface-container-lowest border border-outline-variant/50 rounded-lg px-4 py-3 font-mono text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
+                      type="number"
+                      step="0.1"
+                      min="1"
+                      max="10"
+                      required
+                    />
                   </div>
                 </div>
                 <button

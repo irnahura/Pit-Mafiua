@@ -310,6 +310,9 @@ export const createBettingMarket = async (marketData: {
   startTime: string;
   duration: string;
   raceEvent: string;
+  icon?: string;
+  color?: string;
+  odds?: number;
 }) => {
   try {
     const database = getDb();
@@ -481,6 +484,26 @@ export const toggleUserStatus = async (userId: string, status: 'active' | 'suspe
   } catch (error) {
     console.error('✗ Error toggling user status:', error);
     throw error;
+  }
+};
+
+// Get all active betting markets
+export const getActiveBettingMarkets = async () => {
+  try {
+    const database = getDb();
+    if (!database) return [];
+
+    const marketsRef = collection(database, 'betting_markets');
+    const q = query(marketsRef, where('status', '==', 'open'));
+    const querySnapshot = await getDocs(q);
+
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+  } catch (error) {
+    console.error('✗ Error fetching betting markets:', error);
+    return [];
   }
 };
 
