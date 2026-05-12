@@ -85,6 +85,13 @@ export default function RaceControlAdmin() {
     setIsSubmitting(true);
 
     try {
+      // Verify admin status (case-insensitive)
+      if (!user?.email || user.email.toLowerCase() !== 'wulo@gmail.com') {
+        alert(`Error: You must be signed in as admin (wulo@gmail.com). Currently signed in as: ${user?.email || 'not signed in'}`);
+        setIsSubmitting(false);
+        return;
+      }
+
       await createBettingMarket({
         betName,
         summary,
@@ -105,9 +112,14 @@ export default function RaceControlAdmin() {
       setColor("primary");
       setOdds("2.5");
       loadAdminData();
-    } catch (error) {
-      alert("Error creating betting market");
-      console.error(error);
+    } catch (error: any) {
+      const errorMessage = error?.message || 'Unknown error';
+      if (errorMessage.includes('permission') || errorMessage.includes('insufficient')) {
+        alert(`Permission Error: You must be signed in as admin (Wulo@gmail.com).\n\nCurrent user: ${user?.email || 'not signed in'}\n\nPlease sign out and sign in with the admin account.`);
+      } else {
+        alert(`Error creating betting market: ${errorMessage}`);
+      }
+      console.error('Full error:', error);
     } finally {
       setIsSubmitting(false);
     }

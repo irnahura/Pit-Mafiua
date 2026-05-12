@@ -7,9 +7,10 @@ service cloud.firestore {
     // HELPER FUNCTIONS
     // ============================================
     
-    // Check if user is admin
+    // Check if user is admin (case-insensitive)
     function isAdmin() {
-      return request.auth != null && request.auth.token.email == 'Wulo@gmail.com';
+      return request.auth != null && 
+             request.auth.token.email.lower() == 'wulo@gmail.com';
     }
     
     // Check if user is authenticated
