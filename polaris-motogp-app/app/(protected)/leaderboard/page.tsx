@@ -235,7 +235,7 @@ export default function Leaderboard() {
       <nav className="md:hidden fixed bottom-0 w-full z-50 rounded-t-full bg-surface-container-lowest/90 backdrop-blur-2xl border-t border-primary/10 shadow-[0_-8px_24px_rgba(238,183,207,0.1)] flex justify-around items-center h-20 px-4">
         <a
           className="flex flex-col items-center justify-center text-on-surface-variant/60 hover:text-primary/80 transition-colors"
-          href="/"
+          href="/dashboard"
         >
           <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
             <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z" />
@@ -277,7 +277,7 @@ export default function Leaderboard() {
       <div className="hidden md:flex fixed left-0 top-1/2 -translate-y-1/2 flex-col gap-6 p-6 z-40">
         <div className="glass-card p-3 rounded-full flex flex-col gap-8 border-primary/20">
           <a
-            href="/"
+            href="/dashboard"
             className="text-on-surface-variant hover:text-primary transition-colors"
           >
             <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">

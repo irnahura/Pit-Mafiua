@@ -162,7 +162,7 @@ export default function VictoryPodium() {
       <nav className="md:hidden fixed bottom-0 w-full z-50 rounded-t-full flex justify-around items-center h-20 px-4 bg-surface-container-lowest/90 backdrop-blur-2xl border-t border-primary/10 shadow-[0_-8px_24px_rgba(238,183,207,0.1)]">
         <a
           className="flex flex-col items-center justify-center text-primary bg-primary/10 rounded-full px-4 py-1 scale-90 duration-150 ease-out"
-          href="/"
+          href="/dashboard"
         >
           <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
             <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z" />

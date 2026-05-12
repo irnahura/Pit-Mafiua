@@ -26,7 +26,7 @@ export default function BettingArena() {
           <div className="hidden md:flex items-center gap-6 ml-8">
             <a
               className="text-on-surface-variant font-mono text-[10px] uppercase tracking-[0.2em] hover:text-primary/80 transition-colors"
-              href="/"
+              href="/dashboard"
             >
               Dashboard
             </a>
