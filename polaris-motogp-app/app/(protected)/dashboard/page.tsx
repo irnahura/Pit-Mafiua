@@ -2,11 +2,15 @@
 
 import { DollarSign, TrendingUp, CheckCircle } from "lucide-react";
 import { useUserData, useUserBalance, useUserBets } from "@/hooks/useUserData";
+import { useBettingWindow } from "@/hooks/useBettingWindow";
+import { useRouter } from "next/navigation";
 
 export default function DashboardPage() {
+  const router = useRouter();
   const { userData, loading: userLoading } = useUserData();
   const { balance, loading: balanceLoading } = useUserBalance();
   const { bets, loading: betsLoading } = useUserBets();
+  const { windowTime, loading: windowLoading } = useBettingWindow();
   return (
     <div className="bg-background text-on-background min-h-screen telemetry-grid">
       {/* Main Content */}
@@ -56,7 +60,7 @@ export default function DashboardPage() {
                 Live Telemetry
               </span>
               <h2 className="font-headline text-2xl font-bold leading-tight text-white mb-1">
-                Catalunya Grand Prix
+                Polaris Grand Prix
               </h2>
               <p className="font-mono text-[10px] text-white/40 tracking-wide">
                 Sess: Q2 | Lap 12/24
@@ -65,15 +69,21 @@ export default function DashboardPage() {
             <div className="mt-6">
               <div className="flex justify-between font-mono text-[9px] text-white/40 uppercase mb-3 tracking-wider">
                 <span>Betting Window Closes</span>
-                <span className="text-tertiary">Critical</span>
+                <span className={windowTime.closingSoon ? "text-error" : "text-tertiary"}>
+                  {windowTime.closingSoon ? "Critical" : windowTime.isOpen ? "Active" : "Closed"}
+                </span>
               </div>
               <div className="flex gap-2 items-center">
                 <div className="flex-1 bg-black/40 h-14 rounded-lg flex items-center justify-center border border-white/5">
-                  <span className="font-headline text-3xl text-white font-bold">02</span>
+                  <span className="font-headline text-3xl text-white font-bold">
+                    {windowLoading ? '--' : String(windowTime.hours).padStart(2, '0')}
+                  </span>
                 </div>
                 <div className="text-white/30 text-2xl">:</div>
                 <div className="flex-1 bg-black/40 h-14 rounded-lg flex items-center justify-center border border-white/5">
-                  <span className="font-headline text-3xl text-white font-bold">44</span>
+                  <span className="font-headline text-3xl text-white font-bold">
+                    {windowLoading ? '--' : String(windowTime.minutes).padStart(2, '0')}
+                  </span>
                 </div>
               </div>
             </div>

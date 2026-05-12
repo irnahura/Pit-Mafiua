@@ -12,6 +12,11 @@ interface LeaderboardEntry {
   totalWins: number;
   totalBets: number;
   winRate: number;
+  status?: string;
+  correctPredictions?: number;
+  hasRaceWinnerCorrect?: boolean;
+  earliestBetTime?: number;
+  createdAt?: any;
 }
 
 export function useLeaderboard(limit: number = 10) {

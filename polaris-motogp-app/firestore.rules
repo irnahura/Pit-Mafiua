@@ -1,0 +1,202 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ============================================
+    // HELPER FUNCTIONS
+    // ============================================
+    
+    // Check if user is admin
+    function isAdmin() {
+      return request.auth != null && request.auth.token.email == 'Wulo@gmail.com';
+    }
+    
+    // Check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Check if user owns the document by userId field
+    function isOwnerByUserId() {
+      return request.auth != null && request.auth.uid == resource.data.userId;
+    }
+    
+    // Check if user is creating their own document
+    function isCreatingOwnDocument() {
+      return request.auth != null && request.auth.uid == request.resource.data.userId;
+    }
+    
+    // ============================================
+    // USERS COLLECTION
+    // ============================================
+    
+    match /users/{docId} {
+      // Allow authenticated users to read all users (for leaderboard and queries)
+      allow read: if isAuthenticated();
+      
+      // Allow users to create their own document on signup
+      allow create: if isAuthenticated();
+      
+      // Allow users to update their own data (by userId field)
+      allow update: if isAuthenticated() && 
+                       (request.auth.uid == resource.data.userId || isAdmin());
+      
+      // Only admin can delete users
+      allow delete: if isAdmin();
+    }
+    
+    // ============================================
+    // BETS COLLECTION
+    // ============================================
+    
+    match /bets/{betId} {
+      // Allow authenticated users to read all bets (for queries and leaderboard)
+      allow read: if isAuthenticated();
+      
+      // Allow users to create bets with proper validation
+      allow create: if isAuthenticated() && 
+                       isCreatingOwnDocument() &&
+                       request.resource.data.stakeAmount >= 50 &&
+                       request.resource.data.stakeAmount <= 500 &&
+                       request.resource.data.odds > 0 &&
+                       request.resource.data.marketType != null &&
+                       request.resource.data.raceEvent != null &&
+                       request.resource.data.status == 'pending';
+      
+      // Allow users to update their own bet status, or admin can update any
+      allow update: if isAuthenticated() && 
+                       (isOwnerByUserId() || isAdmin()) &&
+                       (request.resource.data.status in ['won', 'lost', 'pending']);
+      
+      // Only admin can delete bets
+      allow delete: if isAdmin();
+    }
+    
+    // ============================================
+    // BETTING MARKETS COLLECTION
+    // ============================================
+    
+    match /betting_markets/{marketId} {
+      // Allow authenticated users to read betting markets
+      allow read: if isAuthenticated();
+      
+      // Only admin can create, update, or delete betting markets
+      allow create, update, delete: if isAdmin();
+    }
+    
+    // ============================================
+    // SYSTEM COLLECTIONS
+    // ============================================
+    
+    // System logs collection (admin only)
+    match /system_logs/{logId} {
+      // Allow authenticated users to read logs
+      allow read: if isAuthenticated();
+      
+      // Only admin can write logs
+      allow create, update, delete: if isAdmin();
+    }
+    
+    // System status collection
+    match /system_status/{statusId} {
+      // Allow authenticated users to read system status
+      allow read: if isAuthenticated();
+      
+      // Only admin can update system status
+      allow create, update, delete: if isAdmin();
+    }
+    
+    // ============================================
+    // STANDINGS COLLECTIONS
+    // ============================================
+    
+    // Driver standings collection
+    match /driver_standings/{driverId} {
+      // Allow authenticated users to read driver standings
+      allow read: if isAuthenticated();
+      
+      // Only admin can create, update, or delete driver standings
+      allow create, update, delete: if isAdmin();
+    }
+    
+    // Constructor standings collection
+    match /constructor_standings/{constructorId} {
+      // Allow authenticated users to read constructor standings
+      allow read: if isAuthenticated();
+      
+      // Only admin can create, update, or delete constructor standings
+      allow create, update, delete: if isAdmin();
+    }
+    
+    // ============================================
+    // RACE COLLECTIONS
+    // ============================================
+    
+    // Races collection - stores race event information
+    match /races/{raceId} {
+      // Allow authenticated users to read races
+      allow read: if isAuthenticated();
+      
+      // Only admin can write races
+      allow create, update, delete: if isAdmin();
+    }
+    
+    // Race Results collection - stores race results
+    match /raceResults/{resultId} {
+      // Allow authenticated users to read race results
+      allow read: if isAuthenticated();
+      
+      // Only admin can write race results
+      allow create, update, delete: if isAdmin();
+    }
+    
+    // Markets collection - stores betting market definitions
+    match /markets/{marketId} {
+      // Allow authenticated users to read markets
+      allow read: if isAuthenticated();
+      
+      // Only admin can write markets
+      allow create, update, delete: if isAdmin();
+    }
+    
+    // ============================================
+    // LEADERBOARD COLLECTION
+    // ============================================
+    
+    // Leaderboard collection - aggregated user statistics
+    match /leaderboard/{userId} {
+      // Allow authenticated users to read leaderboard
+      allow read: if isAuthenticated();
+      
+      // Only admin can write leaderboard data
+      allow create, update, delete: if isAdmin();
+    }
+    
+    // ============================================
+    // AUDIT LOGS
+    // ============================================
+    
+    // Audit logs - for tracking all activities
+    match /auditLogs/{logId} {
+      // Allow users to read their own logs, admin can read all
+      allow read: if isAuthenticated() && 
+                     (request.auth.uid == resource.data.userId || isAdmin());
+      
+      // Only admin can create audit logs
+      allow create: if isAdmin();
+      
+      // Deny updates and deletes (audit logs are immutable)
+      allow update, delete: if false;
+    }
+    
+    // ============================================
+    // DEFAULT DENY ALL
+    // ============================================
+    
+    // Default deny all other collections
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -37,7 +37,11 @@ export const logUserCreation = async (userId: string, email: string) => {
   }
 };
 
-// Bet logging with PitCoin deduction
+// Betting limits constants
+const MIN_BET_AMOUNT = 50;
+const MAX_BET_AMOUNT = 500;
+
+// Bet logging with PitCoin deduction and betting limits validation
 export const logBet = async (userId: string, betData: {
   marketType: string;
   selection: string;
@@ -49,6 +53,14 @@ export const logBet = async (userId: string, betData: {
   try {
     const database = getDb();
     if (!database) throw new Error('Firestore not initialized');
+
+    // RULE 1: Validate betting limits (50-500 PitCoins per bet)
+    if (betData.stakeAmount < MIN_BET_AMOUNT) {
+      throw new Error(`Minimum bet amount is ${MIN_BET_AMOUNT} PitCoins`);
+    }
+    if (betData.stakeAmount > MAX_BET_AMOUNT) {
+      throw new Error(`Maximum bet amount is ${MAX_BET_AMOUNT} PitCoins`);
+    }
 
     // First, get user's current balance
     const userQuery = query(collection(database, 'users'), where('userId', '==', userId));
@@ -66,7 +78,7 @@ export const logBet = async (userId: string, betData: {
       throw new Error('Insufficient PitCoin balance');
     }
 
-    // Create bet record
+    // Create bet record with submission timestamp for tie-breaker
     const betRef = await addDoc(collection(database, 'bets'), {
       userId,
       marketType: betData.marketType,
@@ -76,8 +88,9 @@ export const logBet = async (userId: string, betData: {
       potentialReturn: betData.potentialReturn,
       raceEvent: betData.raceEvent,
       status: 'pending', // pending, won, lost
-      createdAt: serverTimestamp(),
+      createdAt: serverTimestamp(), // Used for tie-breaker rule #3
       updatedAt: serverTimestamp(),
+      submissionTime: Date.now(), // Explicit timestamp for tie-breaker
     });
 
     // Deduct PitCoin from user balance
@@ -192,22 +205,111 @@ export const getUserBets = async (userId: string) => {
   }
 };
 
-// Get leaderboard
+// ============================================
+// TIE-BREAKER ALGORITHM
+// ============================================
+// Rule: If two or more participants have the same PitCoin balance:
+// 1. Most Correct Predictions (highest number of won bets)
+// 2. Correct Race Winner Prediction (priority to who predicted Race Winner correctly)
+// 3. Earliest Submission Time (who submitted bets earlier)
+
+interface LeaderboardUser {
+  id: string;
+  userId: string;
+  email: string;
+  pitcoinBalance: number;
+  totalBets: number;
+  totalWins: number;
+  totalEarnings: number;
+  correctPredictions: number;
+  hasRaceWinnerCorrect: boolean;
+  earliestBetTime: number;
+  [key: string]: any;
+}
+
+const applyTieBreakerRules = (users: LeaderboardUser[]): LeaderboardUser[] => {
+  return users.sort((a, b) => {
+    // Primary sort: PitCoin balance (descending)
+    if (a.pitcoinBalance !== b.pitcoinBalance) {
+      return b.pitcoinBalance - a.pitcoinBalance;
+    }
+
+    // TIE-BREAKER RULE #1: Most Correct Predictions
+    if (a.correctPredictions !== b.correctPredictions) {
+      return b.correctPredictions - a.correctPredictions;
+    }
+
+    // TIE-BREAKER RULE #2: Correct Race Winner Prediction
+    if (a.hasRaceWinnerCorrect !== b.hasRaceWinnerCorrect) {
+      return a.hasRaceWinnerCorrect ? -1 : 1; // true comes first
+    }
+
+    // TIE-BREAKER RULE #3: Earliest Submission Time
+    return a.earliestBetTime - b.earliestBetTime; // Earlier time wins
+  });
+};
+
+// Get leaderboard with tie-breaker rules applied
 export const getLeaderboard = async (limit: number = 10) => {
   try {
     const database = getDb();
     if (!database) return [];
 
     const usersRef = collection(database, 'users');
-    const q = query(usersRef);
-    const querySnapshot = await getDocs(q);
+    const usersQuery = query(usersRef);
+    const usersSnapshot = await getDocs(usersQuery);
 
-    const users = querySnapshot.docs
-      .map(doc => ({ id: doc.id, ...doc.data() }))
-      .sort((a: any, b: any) => (b.totalEarnings || 0) - (a.totalEarnings || 0))
-      .slice(0, limit);
+    // Fetch all bets to calculate tie-breaker metrics
+    const betsRef = collection(database, 'bets');
+    const betsSnapshot = await getDocs(betsRef);
+    const allBets = betsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-    return users;
+    const users: LeaderboardUser[] = await Promise.all(
+      usersSnapshot.docs.map(async (userDoc) => {
+        const userData = userDoc.data();
+        const userId = userData.userId;
+
+        // Get user's bets
+        const userBets = allBets.filter((bet: any) => bet.userId === userId);
+
+        // Calculate correct predictions (won bets)
+        const correctPredictions = userBets.filter((bet: any) => bet.status === 'won').length;
+
+        // Check if user has correct Race Winner prediction
+        const hasRaceWinnerCorrect = userBets.some(
+          (bet: any) => 
+            bet.status === 'won' && 
+            (bet.marketType?.toLowerCase().includes('race winner') || 
+             bet.marketType?.toLowerCase().includes('winner'))
+        );
+
+        // Get earliest bet submission time
+        const betTimes = userBets
+          .map((bet: any) => bet.submissionTime || bet.createdAt?.toMillis?.() || Date.now())
+          .filter(time => time > 0);
+        const earliestBetTime = betTimes.length > 0 ? Math.min(...betTimes) : Date.now();
+
+        return {
+          id: userDoc.id,
+          userId: userData.userId,
+          email: userData.email,
+          pitcoinBalance: userData.pitcoinBalance || 0,
+          totalBets: userData.totalBets || 0,
+          totalWins: userData.totalWins || 0,
+          totalEarnings: userData.totalEarnings || 0,
+          winRate: userData.winRate || 0,
+          status: userData.status || 'active',
+          correctPredictions,
+          hasRaceWinnerCorrect,
+          earliestBetTime,
+          createdAt: userData.createdAt,
+        };
+      })
+    );
+
+    // Apply tie-breaker rules and limit results
+    const sortedUsers = applyTieBreakerRules(users);
+    return sortedUsers.slice(0, limit);
   } catch (error) {
     console.error('✗ Error fetching leaderboard:', error);
     return [];
@@ -504,6 +606,140 @@ export const getActiveBettingMarkets = async () => {
   } catch (error) {
     console.error('✗ Error fetching betting markets:', error);
     return [];
+  }
+};
+
+// ============================================
+// STANDINGS FUNCTIONS
+// ============================================
+
+// Get driver standings
+export const getDriverStandings = async () => {
+  try {
+    const database = getDb();
+    if (!database) return [];
+
+    const driversRef = collection(database, 'driver_standings');
+    const querySnapshot = await getDocs(driversRef);
+
+    const drivers = querySnapshot.docs
+      .map(doc => ({ id: doc.id, ...doc.data() }))
+      .sort((a: any, b: any) => (b.points || 0) - (a.points || 0));
+
+    return drivers;
+  } catch (error) {
+    console.error('✗ Error fetching driver standings:', error);
+    return [];
+  }
+};
+
+// Get constructor standings
+export const getConstructorStandings = async () => {
+  try {
+    const database = getDb();
+    if (!database) return [];
+
+    const constructorsRef = collection(database, 'constructor_standings');
+    const querySnapshot = await getDocs(constructorsRef);
+
+    const constructors = querySnapshot.docs
+      .map(doc => ({ id: doc.id, ...doc.data() }))
+      .sort((a: any, b: any) => (b.points || 0) - (a.points || 0));
+
+    return constructors;
+  } catch (error) {
+    console.error('✗ Error fetching constructor standings:', error);
+    return [];
+  }
+};
+
+// Add or update driver standing (admin only)
+export const updateDriverStanding = async (driverData: {
+  name: string;
+  team: string;
+  points: number;
+  position: number;
+  positionChange?: number;
+  consistency?: number;
+  avgPosition?: string;
+  avatar?: string;
+  nationality?: string;
+}) => {
+  try {
+    const database = getDb();
+    if (!database) throw new Error('Firestore not initialized');
+
+    // Check if driver exists
+    const driversRef = collection(database, 'driver_standings');
+    const q = query(driversRef, where('name', '==', driverData.name));
+    const querySnapshot = await getDocs(q);
+
+    if (!querySnapshot.empty) {
+      // Update existing driver
+      const driverDoc = querySnapshot.docs[0];
+      await updateDoc(driverDoc.ref, {
+        ...driverData,
+        updatedAt: serverTimestamp(),
+      });
+      console.log('✓ Driver standing updated:', driverData.name);
+    } else {
+      // Create new driver
+      await addDoc(driversRef, {
+        ...driverData,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      console.log('✓ Driver standing created:', driverData.name);
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error('✗ Error updating driver standing:', error);
+    throw error;
+  }
+};
+
+// Add or update constructor standing (admin only)
+export const updateConstructorStanding = async (constructorData: {
+  name: string;
+  points: number;
+  position: number;
+  positionChange?: number;
+  wins?: number;
+  podiums?: number;
+  logo?: string;
+}) => {
+  try {
+    const database = getDb();
+    if (!database) throw new Error('Firestore not initialized');
+
+    // Check if constructor exists
+    const constructorsRef = collection(database, 'constructor_standings');
+    const q = query(constructorsRef, where('name', '==', constructorData.name));
+    const querySnapshot = await getDocs(q);
+
+    if (!querySnapshot.empty) {
+      // Update existing constructor
+      const constructorDoc = querySnapshot.docs[0];
+      await updateDoc(constructorDoc.ref, {
+        ...constructorData,
+        updatedAt: serverTimestamp(),
+      });
+      console.log('✓ Constructor standing updated:', constructorData.name);
+    } else {
+      // Create new constructor
+      await addDoc(constructorsRef, {
+        ...constructorData,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      console.log('✓ Constructor standing created:', constructorData.name);
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error('✗ Error updating constructor standing:', error);
+    throw error;
   }
 };
 

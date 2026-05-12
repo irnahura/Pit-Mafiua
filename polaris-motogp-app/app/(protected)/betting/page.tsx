@@ -89,6 +89,7 @@ export default function BettingArena() {
       return;
     }
 
+    // RULE: Betting Limits (50-500 PitCoins)
     if (isNaN(amount) || amount < 50) {
       setErrors(prev => ({ ...prev, [market.id]: 'Minimum bet is 50 PC' }));
       return;

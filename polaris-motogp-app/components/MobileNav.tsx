@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { isAdmin } from "@/lib/admin-guard";
+import Link from "next/link";
 
 export default function MobileNav() {
   const pathname = usePathname();
@@ -13,7 +14,7 @@ export default function MobileNav() {
 
   return (
     <nav className="md:hidden fixed bottom-0 w-full z-50 bg-black/95 backdrop-blur-2xl border-t border-white/5 flex justify-around items-center h-20 px-4">
-      <a
+      <Link
         className={`flex flex-col items-center justify-center ${
           isActive('/dashboard')
             ? 'text-primary bg-primary/10 rounded-full px-4 py-2'
@@ -27,8 +28,8 @@ export default function MobileNav() {
         <span className="font-mono text-[9px] uppercase mt-1 tracking-wider">
           Dashboard
         </span>
-      </a>
-      <a
+      </Link>
+      <Link
         className={`flex flex-col items-center justify-center ${
           isActive('/betting')
             ? 'text-primary bg-primary/10 rounded-full px-4 py-2'
@@ -42,8 +43,23 @@ export default function MobileNav() {
         <span className="font-mono text-[9px] uppercase mt-1 tracking-wider">
           Betting
         </span>
-      </a>
-      <a
+      </Link>
+      <Link
+        className={`flex flex-col items-center justify-center ${
+          isActive('/standings')
+            ? 'text-primary bg-primary/10 rounded-full px-4 py-2'
+            : 'text-white/40'
+        }`}
+        href="/standings"
+      >
+        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
+        </svg>
+        <span className="font-mono text-[9px] uppercase mt-1 tracking-wider">
+          Standings
+        </span>
+      </Link>
+      <Link
         className={`flex flex-col items-center justify-center ${
           isActive('/leaderboard')
             ? 'text-primary bg-primary/10 rounded-full px-4 py-2'
@@ -57,8 +73,8 @@ export default function MobileNav() {
         <span className="font-mono text-[9px] uppercase mt-1 tracking-wider">
           Leaderboard
         </span>
-      </a>
-      <a
+      </Link>
+      <Link
         className={`flex flex-col items-center justify-center ${
           isActive('/victory')
             ? 'text-primary bg-primary/10 rounded-full px-4 py-2'
@@ -72,9 +88,9 @@ export default function MobileNav() {
         <span className="font-mono text-[9px] uppercase mt-1 tracking-wider">
           Results
         </span>
-      </a>
+      </Link>
       {userIsAdmin && (
-        <a
+        <Link
           className={`flex flex-col items-center justify-center ${
             isActive('/Nevada')
               ? 'text-primary bg-primary/10 rounded-full px-4 py-2'
@@ -88,7 +104,7 @@ export default function MobileNav() {
           <span className="font-mono text-[9px] uppercase mt-1 tracking-wider">
             Admin
           </span>
-        </a>
+        </Link>
       )}
     </nav>
   );

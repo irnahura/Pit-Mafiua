@@ -4,6 +4,7 @@ import { useAuth } from "@/lib/auth-context";
 import { usePathname, useRouter } from "next/navigation";
 import { useUserBalance } from "@/hooks/useUserData";
 import { isAdmin } from "@/lib/admin-guard";
+import Link from "next/link";
 
 export default function Navbar() {
   const { user, signOut } = useAuth();
@@ -26,14 +27,14 @@ export default function Navbar() {
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-[#0a0809]/95 backdrop-blur-xl border-b border-white/5 h-16 flex justify-between items-center w-full px-8 md:px-16">
       <div className="flex items-center gap-4">
-        <span className="font-headline text-xl font-black tracking-wider text-white">
+        <Link href="/dashboard" className="font-headline text-xl font-black tracking-wider text-white hover:text-primary transition-colors">
           POLARIS
-        </span>
+        </Link>
       </div>
 
       {/* Desktop Nav */}
       <div className="hidden md:flex gap-12 items-center">
-        <a
+        <Link
           className={`font-mono text-[10px] uppercase tracking-[0.2em] transition-colors ${
             isActive('/dashboard')
               ? 'text-white font-bold'
@@ -42,8 +43,8 @@ export default function Navbar() {
           href="/dashboard"
         >
           Dashboard
-        </a>
-        <a
+        </Link>
+        <Link
           className={`font-mono text-[10px] uppercase tracking-[0.2em] transition-colors ${
             isActive('/betting')
               ? 'text-white font-bold'
@@ -52,8 +53,18 @@ export default function Navbar() {
           href="/betting"
         >
           Betting
-        </a>
-        <a
+        </Link>
+        <Link
+          className={`font-mono text-[10px] uppercase tracking-[0.2em] transition-colors ${
+            isActive('/standings')
+              ? 'text-white font-bold'
+              : 'text-white/40 hover:text-primary/80'
+          }`}
+          href="/standings"
+        >
+          Standings
+        </Link>
+        <Link
           className={`font-mono text-[10px] uppercase tracking-[0.2em] transition-colors ${
             isActive('/leaderboard')
               ? 'text-white font-bold'
@@ -62,8 +73,8 @@ export default function Navbar() {
           href="/leaderboard"
         >
           Leaderboard
-        </a>
-        <a
+        </Link>
+        <Link
           className={`font-mono text-[10px] uppercase tracking-[0.2em] transition-colors ${
             isActive('/victory')
               ? 'text-white font-bold'
@@ -72,9 +83,9 @@ export default function Navbar() {
           href="/victory"
         >
           Results
-        </a>
+        </Link>
         {userIsAdmin && (
-          <a
+          <Link
             className={`font-mono text-[10px] uppercase tracking-[0.2em] transition-colors ${
               isActive('/Nevada')
                 ? 'text-white font-bold'
@@ -83,7 +94,7 @@ export default function Navbar() {
             href="/Nevada"
           >
             Admin
-          </a>
+          </Link>
         )}
       </div>
 
