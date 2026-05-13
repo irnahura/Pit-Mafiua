@@ -1,5 +1,7 @@
-import { getFirestore, collection, addDoc, serverTimestamp, query, where, getDocs, updateDoc, doc, Firestore } from 'firebase/firestore';
+import { getFirestore, collection, addDoc, serverTimestamp, query, where, getDocs, updateDoc, doc, Firestore, writeBatch } from 'firebase/firestore';
 import { getFirebaseApp } from './firebase';
+import { retryWithBackoff, isRetryableError } from './retry';
+import { logInfo, logError, logWarn } from './logger';
 
 let db: Firestore | null = null;
 
@@ -17,23 +19,27 @@ const getDb = (): Firestore | null => {
 // User creation logging with default PitCoin balance
 export const logUserCreation = async (userId: string, email: string) => {
   try {
-    const database = getDb();
-    if (!database) throw new Error('Firestore not initialized');
+    await retryWithBackoff(async () => {
+      const database = getDb();
+      if (!database) throw new Error('Firestore not initialized');
 
-    await addDoc(collection(database, 'users'), {
-      userId,
-      email,
-      createdAt: serverTimestamp(),
-      pitcoinBalance: 2000, // Default starting balance
-      totalBets: 0,
-      totalEarnings: 0,
-      totalWins: 0,
-      winRate: 0,
-      status: 'active',
+      await addDoc(collection(database, 'users'), {
+        userId,
+        email,
+        createdAt: serverTimestamp(),
+        pitcoinBalance: 2000,
+        totalBets: 0,
+        totalEarnings: 0,
+        totalWins: 0,
+        winRate: 0,
+        status: 'active',
+      });
+      
+      logInfo('User created', { userId, email });
     });
-    console.log('✓ User logged in Firestore:', userId);
   } catch (error) {
-    console.error('✗ Error logging user:', error);
+    logError('Error creating user', { userId, email, error });
+    throw error;
   }
 };
 
@@ -82,9 +88,11 @@ export const logBet = async (userId: string, betData: {
   marketId?: string;
   betType?: string;
 }) => {
+  const endTimer = startTimer('logBet');
   try {
-    const database = getDb();
-    if (!database) throw new Error('Firestore not initialized');
+    await retryWithBackoff(async () => {
+      const database = getDb();
+      if (!database) throw new Error('Firestore not initialized');
 
     // RULE 1: Validate betting limits (50-500 PitCoins per bet)
     if (betData.stakeAmount < MIN_BET_AMOUNT) {
@@ -199,30 +207,34 @@ export const logBet = async (userId: string, betData: {
       lastBetAt: serverTimestamp(),
     });
 
-    console.log('✓ Bet logged:', betRef.id);
-    console.log(`✓ PitCoin deducted. New balance: ${newBalance}`);
-    return { betId: betRef.id, newBalance };
+      logInfo('Bet logged successfully', { betId: betRef.id, userId, newBalance });
+      return { betId: betRef.id, newBalance };
+    });
   } catch (error) {
-    console.error('✗ Error logging bet:', error);
+    logError('Error logging bet', { userId, error });
     throw error;
+  } finally {
+    endTimer();
   }
 };
 
 // Get user's current PitCoin balance
 export const getUserBalance = async (userId: string): Promise<number> => {
   try {
-    const database = getDb();
-    if (!database) return 0;
+    return await retryWithBackoff(async () => {
+      const database = getDb();
+      if (!database) return 0;
 
-    const userQuery = query(collection(database, 'users'), where('userId', '==', userId));
-    const querySnapshot = await getDocs(userQuery);
+      const userQuery = query(collection(database, 'users'), where('userId', '==', userId));
+      const querySnapshot = await getDocs(userQuery);
 
-    if (!querySnapshot.empty) {
-      return querySnapshot.docs[0].data().pitcoinBalance || 0;
-    }
-    return 0;
+      if (!querySnapshot.empty) {
+        return querySnapshot.docs[0].data().pitcoinBalance || 0;
+      }
+      return 0;
+    });
   } catch (error) {
-    console.error('✗ Error fetching user balance:', error);
+    logError('Error fetching user balance', { userId, error });
     return 0;
   }
 };
@@ -230,8 +242,9 @@ export const getUserBalance = async (userId: string): Promise<number> => {
 // Update bet result and adjust balance if won
 export const updateBetResult = async (betId: string, result: 'won' | 'lost', userId?: string) => {
   try {
-    const database = getDb();
-    if (!database) throw new Error('Firestore not initialized');
+    await retryWithBackoff(async () => {
+      const database = getDb();
+      if (!database) throw new Error('Firestore not initialized');
 
     const betRef = doc(database, 'bets', betId);
     const betDoc = await getDocs(query(collection(database, 'bets'), where('userId', '==', userId)));
@@ -258,14 +271,15 @@ export const updateBetResult = async (betId: string, result: 'won' | 'lost', use
       }
     }
 
-    await updateDoc(betRef, {
-      status: result,
-      updatedAt: serverTimestamp(),
-    });
+      await updateDoc(betRef, {
+        status: result,
+        updatedAt: serverTimestamp(),
+      });
 
-    console.log('✓ Bet result updated:', betId);
+      logInfo('Bet result updated', { betId, result, userId });
+    });
   } catch (error) {
-    console.error('✗ Error updating bet result:', error);
+    logError('Error updating bet result', { betId, result, error });
   }
 };
 
@@ -517,26 +531,31 @@ export const createBettingMarket = async (marketData: {
   selectionType?: string; // NEW: single, multiple, numeric
   maxSelections?: number; // NEW: For podium (3), top5 (5)
 }) => {
+  const endTimer = startTimer('createBettingMarket');
   try {
-    const database = getDb();
-    if (!database) throw new Error('Firestore not initialized');
+    return await retryWithBackoff(async () => {
+      const database = getDb();
+      if (!database) throw new Error('Firestore not initialized');
 
-    const marketRef = await addDoc(collection(database, 'betting_markets'), {
-      ...marketData,
-      betType: marketData.betType || 'race-winner',
-      selectionType: marketData.selectionType || 'single',
-      maxSelections: marketData.maxSelections || 1,
-      status: 'open',
-      createdAt: serverTimestamp(),
-      totalStake: 0,
-      participantCount: 0,
+      const marketRef = await addDoc(collection(database, 'betting_markets'), {
+        ...marketData,
+        betType: marketData.betType || 'race-winner',
+        selectionType: marketData.selectionType || 'single',
+        maxSelections: marketData.maxSelections || 1,
+        status: 'open',
+        createdAt: serverTimestamp(),
+        totalStake: 0,
+        participantCount: 0,
+      });
+
+      logInfo('Betting market created', { marketId: marketRef.id, betName: marketData.betName });
+      return { marketId: marketRef.id };
     });
-
-    console.log('✓ Betting market created:', marketRef.id);
-    return { marketId: marketRef.id };
   } catch (error) {
-    console.error('✗ Error creating betting market:', error);
+    logError('Error creating betting market', { marketData, error });
     throw error;
+  } finally {
+    endTimer();
   }
 };
 
@@ -781,19 +800,21 @@ export const getUserActiveBet = async (userId: string, marketId: string) => {
 // Close a specific betting market (admin only)
 export const closeBettingMarket = async (marketId: string) => {
   try {
-    const database = getDb();
-    if (!database) throw new Error('Firestore not initialized');
+    return await retryWithBackoff(async () => {
+      const database = getDb();
+      if (!database) throw new Error('Firestore not initialized');
 
-    const marketRef = doc(database, 'betting_markets', marketId);
-    await updateDoc(marketRef, {
-      status: 'closed',
-      closedAt: serverTimestamp(),
+      const marketRef = doc(database, 'betting_markets', marketId);
+      await updateDoc(marketRef, {
+        status: 'closed',
+        closedAt: serverTimestamp(),
+      });
+
+      logInfo('Betting market closed', { marketId });
+      return { success: true };
     });
-
-    console.log('✓ Betting market closed:', marketId);
-    return { success: true };
   } catch (error) {
-    console.error('✗ Error closing betting market:', error);
+    logError('Error closing betting market', { marketId, error });
     throw error;
   }
 };
@@ -835,9 +856,11 @@ const compareSelections = (userSelection: string, winningSelection: string, betT
 
 // Finalize specific market results with first-bet-wins logic (admin only)
 export const finalizeMarketResults = async (marketId: string, winningSelection: string) => {
+  const endTimer = startTimer('finalizeMarketResults');
   try {
-    const database = getDb();
-    if (!database) throw new Error('Firestore not initialized');
+    return await retryWithBackoff(async () => {
+      const database = getDb();
+      if (!database) throw new Error('Firestore not initialized');
 
     // Get market to check bet type
     const marketRef = doc(database, 'betting_markets', marketId);
@@ -931,11 +954,14 @@ export const finalizeMarketResults = async (marketId: string, winningSelection: 
       finalizedAt: serverTimestamp(),
     });
 
-    console.log('✓ Market results finalized. First bet wins!');
-    return { success: true, winnersCount: 1, winnerUserId: userId };
+      logInfo('Market results finalized', { marketId, winningSelection, winnersCount: 1, winnerUserId: userId });
+      return { success: true, winnersCount: 1, winnerUserId: userId };
+    });
   } catch (error) {
-    console.error('✗ Error finalizing market results:', error);
+    logError('Error finalizing market results', { marketId, winningSelection, error });
     throw error;
+  } finally {
+    endTimer();
   }
 };
 
@@ -1106,9 +1132,11 @@ export const createParlay = async (userId: string, parlayData: {
   stakeAmount: number;
   raceEvent: string;
 }) => {
+  const endTimer = startTimer('createParlay');
   try {
-    const database = getDb();
-    if (!database) throw new Error('Firestore not initialized');
+    return await retryWithBackoff(async () => {
+      const database = getDb();
+      if (!database) throw new Error('Firestore not initialized');
 
     // Validate minimum 2 selections
     if (parlayData.selections.length < 2) {
@@ -1174,11 +1202,14 @@ export const createParlay = async (userId: string, parlayData: {
       lastBetAt: serverTimestamp(),
     });
 
-    console.log('✓ Parlay created:', parlayRef.id);
-    return { parlayId: parlayRef.id, newBalance, combinedOdds };
+      logInfo('Parlay created', { parlayId: parlayRef.id, userId, selectionsCount: parlayData.selections.length, combinedOdds });
+      return { parlayId: parlayRef.id, newBalance, combinedOdds };
+    });
   } catch (error) {
-    console.error('✗ Error creating parlay:', error);
+    logError('Error creating parlay', { userId, error });
     throw error;
+  } finally {
+    endTimer();
   }
 };
 

@@ -5,8 +5,10 @@ import { useUserBalance } from "@/hooks/useUserData";
 import { useAuth } from "@/lib/auth-context";
 import { useBettingMarkets } from "@/hooks/useBettingMarkets";
 import { logBet, getUserActiveBet } from "@/lib/firestore";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback, memo } from "react";
 import RiderAutocomplete from "@/components/RiderAutocomplete";
+import { usePerformance } from "@/hooks/usePerformance";
+import { trackAction } from "@/lib/logger";
 
 // Icon mapping for different bet types
 const iconMap: Record<string, any> = {
@@ -27,7 +29,193 @@ const colorMap: Record<string, string> = {
   secondary: 'secondary',
 };
 
+// Memoized betting card component for better performance
+const BettingCard = memo(({ 
+  market, 
+  IconComponent, 
+  colorClass, 
+  odds, 
+  time, 
+  isClosed, 
+  userBet, 
+  isLocked,
+  betAmount,
+  betSelection,
+  submitting,
+  error,
+  loadingBets,
+  onAmountChange,
+  onSelectionChange,
+  onPlaceBet
+}: any) => {
+  return (
+    <div
+      className={`glass-card group hover:border-${colorClass}/50 transition-all duration-300 p-6 rounded-xl flex flex-col justify-between ${
+        isClosed || isLocked ? 'opacity-75' : ''
+      }`}
+    >
+      <div>
+        <div className="flex justify-between items-start mb-6">
+          <div className={`w-12 h-12 rounded-lg bg-${colorClass}/10 flex items-center justify-center border border-${colorClass}/20`}>
+            {isLocked ? (
+              <Lock className={`text-${colorClass} w-6 h-6`} />
+            ) : (
+              <IconComponent className={`text-${colorClass} w-6 h-6`} />
+            )}
+          </div>
+          <div className="flex flex-col items-end gap-1">
+            <span className={`bg-${colorClass}/20 text-${colorClass} font-mono text-xl px-3 py-1 rounded-full font-bold`}>
+              {odds}X
+            </span>
+            {!isClosed && !isLocked && (
+              <span className="text-on-surface-variant font-mono text-[10px]">
+                {time.hours}h {time.minutes}m
+              </span>
+            )}
+            {isLocked && (
+              <span className="text-tertiary font-mono text-[10px] uppercase">
+                Locked
+              </span>
+            )}
+          </div>
+        </div>
+        <h3 className="font-headline text-2xl text-on-surface uppercase mb-2 font-bold">
+          {market.betName}
+        </h3>
+        {market.betType && market.betType !== 'race-winner' && (
+          <div className="mb-2">
+            <span className="text-[10px] font-mono uppercase px-2 py-1 rounded bg-tertiary/20 text-tertiary">
+              {market.betType === 'podium' && '🏆 Top 3'}
+              {market.betType === 'top5' && '🏆 Top 5'}
+              {market.betType === 'fastest-lap' && '⚡ Fastest Lap'}
+              {market.betType === 'pole-position' && '🎯 Pole Position'}
+            </span>
+          </div>
+        )}
+        <p className="text-on-surface-variant text-base mb-4">
+          {market.summary}
+        </p>
+        {market.betType === 'podium' && (
+          <p className="text-[10px] text-tertiary font-mono mb-4">
+            💡 Predict the top 3 finishers in order
+          </p>
+        )}
+        {market.betType === 'top5' && (
+          <p className="text-[10px] text-tertiary font-mono mb-4">
+            💡 Predict the top 5 finishers in order
+          </p>
+        )}
+      </div>
+
+      {/* Show locked bet info */}
+      {isLocked && userBet && (
+        <div className="space-y-3 bg-surface-container-highest/50 p-4 rounded-lg border border-tertiary/30">
+          <div className="flex items-center gap-2 mb-2">
+            <Lock className="w-4 h-4 text-tertiary" />
+            <span className="font-mono text-[12px] text-tertiary uppercase font-bold">
+              Your Active Bet
+            </span>
+          </div>
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <span className="text-on-surface-variant text-sm">Prediction:</span>
+              <span className="text-on-surface font-semibold">{userBet.selection}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-on-surface-variant text-sm">Stake:</span>
+              <span className="text-primary font-mono font-bold">{userBet.stakeAmount} PC</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-on-surface-variant text-sm">Potential Return:</span>
+              <span className="text-tertiary font-mono font-bold">{userBet.potentialReturn?.toLocaleString()} PC</span>
+            </div>
+          </div>
+          <p className="text-on-surface-variant text-[10px] font-mono mt-3 text-center">
+            Wait for this bet to end before placing another
+          </p>
+        </div>
+      )}
+
+      {/* Show betting form if not locked */}
+      {!isLocked && (
+        <div className="space-y-4">
+          {/* Prediction Input with Autocomplete */}
+          <div className="relative">
+            <RiderAutocomplete
+              value={betSelection || ''}
+              onChange={onSelectionChange}
+              placeholder={
+                market.betType === 'podium' ? 'Select top 3 riders...' :
+                market.betType === 'top5' ? 'Select top 5 riders...' :
+                market.betType === 'fastest-lap' ? 'Select rider...' :
+                market.betType === 'pole-position' ? 'Select rider...' :
+                'Select rider...'
+              }
+              disabled={isClosed || submitting || loadingBets}
+              multiple={market.betType === 'podium' || market.betType === 'top5'}
+              maxSelections={market.betType === 'podium' ? 3 : market.betType === 'top5' ? 5 : 1}
+            />
+            <label className="absolute -top-2 left-3 bg-background px-2 text-[10px] font-mono text-outline uppercase z-10">
+              {market.betType === 'podium' ? 'Top 3 Riders' :
+               market.betType === 'top5' ? 'Top 5 Riders' :
+               'Your Prediction'}
+            </label>
+          </div>
+
+          {/* Amount Input */}
+          <div className="relative">
+            <span className={`absolute left-4 top-1/2 -translate-y-1/2 font-mono text-${colorClass} font-bold`}>
+              PC
+            </span>
+            <input
+              className={`w-full bg-surface-container-lowest border border-outline-variant/30 rounded-lg py-4 pl-12 pr-4 font-mono text-xl text-on-surface focus:ring-2 focus:ring-${colorClass}/50 focus:border-${colorClass} outline-none transition-all`}
+              max="500"
+              min="50"
+              placeholder="0.00"
+              type="number"
+              value={betAmount || ''}
+              onChange={onAmountChange}
+              disabled={isClosed || submitting || loadingBets}
+            />
+            <label className="absolute -top-2 left-3 bg-background px-2 text-[10px] font-mono text-outline uppercase">
+              Amount (50-500)
+            </label>
+          </div>
+
+          {/* Error Message */}
+          {error && (
+            <p className="text-error text-sm font-mono">{error}</p>
+          )}
+
+          {/* Submit Button */}
+          <button
+            onClick={onPlaceBet}
+            disabled={isClosed || submitting || loadingBets}
+            className={`w-full py-4 ${
+              colorClass === 'primary'
+                ? 'bg-primary text-on-primary'
+                : `border border-${colorClass} text-${colorClass} hover:bg-${colorClass}/10`
+            } font-headline text-base uppercase italic tracking-tighter rounded-lg hover:brightness-110 active:scale-95 transition-all font-bold disabled:opacity-50 disabled:cursor-not-allowed`}
+          >
+            {isClosed
+              ? 'Betting Closed'
+              : loadingBets
+              ? 'Loading...'
+              : submitting
+              ? 'Placing Bet...'
+              : 'Lock Prediction'}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+});
+
+BettingCard.displayName = 'BettingCard';
+
 export default function BettingArena() {
+  usePerformance('BettingArena');
+  
   const { balance, loading: balanceLoading, refreshBalance } = useUserBalance();
   const { user } = useAuth();
   const { markets, loading: marketsLoading, error: marketsError } = useBettingMarkets();
@@ -94,22 +282,22 @@ export default function BettingArena() {
     return () => clearInterval(interval);
   }, [markets]);
 
-  const formatTimeRemaining = (ms: number) => {
+  const formatTimeRemaining = useCallback((ms: number) => {
     const hours = Math.floor(ms / (1000 * 60 * 60));
     const minutes = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
     return { hours, minutes };
-  };
+  }, []);
 
-  const handleBetAmountChange = (marketId: string, value: string) => {
+  const handleBetAmountChange = useCallback((marketId: string, value: string) => {
     setBetAmounts(prev => ({ ...prev, [marketId]: value }));
     setErrors(prev => ({ ...prev, [marketId]: '' }));
-  };
+  }, []);
 
-  const handleBetSelectionChange = (marketId: string, value: string) => {
+  const handleBetSelectionChange = useCallback((marketId: string, value: string) => {
     setBetSelections(prev => ({ ...prev, [marketId]: value }));
-  };
+  }, []);
 
-  const handlePlaceBet = async (market: any) => {
+  const handlePlaceBet = useCallback(async (market: any) => {
     if (!user) {
       setErrors(prev => ({ ...prev, [market.id]: 'Please sign in to place bets' }));
       return;
@@ -175,27 +363,33 @@ export default function BettingArena() {
       // Refresh balance
       await refreshBalance();
 
+      trackAction('bet_placed', { marketId: market.id, amount, selection }, user.uid);
       alert(`Bet placed successfully! Potential return: ${potentialReturn.toLocaleString()} PC`);
     } catch (error: any) {
       setErrors(prev => ({ ...prev, [market.id]: error.message || 'Failed to place bet' }));
     } finally {
       setSubmitting(prev => ({ ...prev, [market.id]: false }));
     }
-  };
+  }, [user, betAmounts, betSelections, balance, userActiveBets, refreshBalance]);
 
-  const getIconComponent = (iconName: string) => {
+  const getIconComponent = useCallback((iconName: string) => {
     return iconMap[iconName?.toLowerCase()] || Trophy;
-  };
+  }, []);
 
-  const getColorClass = (colorName: string) => {
+  const getColorClass = useCallback((colorName: string) => {
     return colorMap[colorName?.toLowerCase()] || 'primary';
-  };
+  }, []);
 
-  // Get the earliest closing time for the hero section
-  const earliestClosingTime = markets.length > 0 
-    ? Math.min(...Object.values(timeRemaining))
-    : 0;
-  const heroTime = formatTimeRemaining(earliestClosingTime);
+  // Memoize the earliest closing time calculation
+  const earliestClosingTime = useMemo(() => 
+    markets.length > 0 ? Math.min(...Object.values(timeRemaining)) : 0,
+    [markets.length, timeRemaining]
+  );
+
+  const heroTime = useMemo(() => 
+    formatTimeRemaining(earliestClosingTime),
+    [earliestClosingTime, formatTimeRemaining]
+  );
 
   return (
     <div className="bg-background text-on-surface overflow-x-hidden telemetry-grid min-h-screen">
@@ -337,166 +531,25 @@ export default function BettingArena() {
               const isLocked = !!userBet;
 
               return (
-                <div
+                <BettingCard
                   key={market.id}
-                  className={`glass-card group hover:border-${colorClass}/50 transition-all duration-300 p-6 rounded-xl flex flex-col justify-between ${
-                    isClosed || isLocked ? 'opacity-75' : ''
-                  }`}
-                >
-                  <div>
-                    <div className="flex justify-between items-start mb-6">
-                      <div className={`w-12 h-12 rounded-lg bg-${colorClass}/10 flex items-center justify-center border border-${colorClass}/20`}>
-                        {isLocked ? (
-                          <Lock className={`text-${colorClass} w-6 h-6`} />
-                        ) : (
-                          <IconComponent className={`text-${colorClass} w-6 h-6`} />
-                        )}
-                      </div>
-                      <div className="flex flex-col items-end gap-1">
-                        <span className={`bg-${colorClass}/20 text-${colorClass} font-mono text-xl px-3 py-1 rounded-full font-bold`}>
-                          {odds}X
-                        </span>
-                        {!isClosed && !isLocked && (
-                          <span className="text-on-surface-variant font-mono text-[10px]">
-                            {time.hours}h {time.minutes}m
-                          </span>
-                        )}
-                        {isLocked && (
-                          <span className="text-tertiary font-mono text-[10px] uppercase">
-                            Locked
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <h3 className="font-headline text-2xl text-on-surface uppercase mb-2 font-bold">
-                      {market.betName}
-                    </h3>
-                    {market.betType && market.betType !== 'race-winner' && (
-                      <div className="mb-2">
-                        <span className="text-[10px] font-mono uppercase px-2 py-1 rounded bg-tertiary/20 text-tertiary">
-                          {market.betType === 'podium' && '🏆 Top 3'}
-                          {market.betType === 'top5' && '🏆 Top 5'}
-                          {market.betType === 'fastest-lap' && '⚡ Fastest Lap'}
-                          {market.betType === 'pole-position' && '🎯 Pole Position'}
-                        </span>
-                      </div>
-                    )}
-                    <p className="text-on-surface-variant text-base mb-4">
-                      {market.summary}
-                    </p>
-                    {market.betType === 'podium' && (
-                      <p className="text-[10px] text-tertiary font-mono mb-4">
-                        💡 Predict the top 3 finishers in order
-                      </p>
-                    )}
-                    {market.betType === 'top5' && (
-                      <p className="text-[10px] text-tertiary font-mono mb-4">
-                        💡 Predict the top 5 finishers in order
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Show locked bet info */}
-                  {isLocked && userBet && (
-                    <div className="space-y-3 bg-surface-container-highest/50 p-4 rounded-lg border border-tertiary/30">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Lock className="w-4 h-4 text-tertiary" />
-                        <span className="font-mono text-[12px] text-tertiary uppercase font-bold">
-                          Your Active Bet
-                        </span>
-                      </div>
-                      <div className="space-y-2">
-                        <div className="flex justify-between">
-                          <span className="text-on-surface-variant text-sm">Prediction:</span>
-                          <span className="text-on-surface font-semibold">{userBet.selection}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-on-surface-variant text-sm">Stake:</span>
-                          <span className="text-primary font-mono font-bold">{userBet.stakeAmount} PC</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-on-surface-variant text-sm">Potential Return:</span>
-                          <span className="text-tertiary font-mono font-bold">{userBet.potentialReturn?.toLocaleString()} PC</span>
-                        </div>
-                      </div>
-                      <p className="text-on-surface-variant text-[10px] font-mono mt-3 text-center">
-                        Wait for this bet to end before placing another
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Show betting form if not locked */}
-                  {!isLocked && (
-                    <div className="space-y-4">
-                      {/* Prediction Input with Autocomplete */}
-                      <div className="relative">
-                        <RiderAutocomplete
-                          value={betSelections[market.id] || ''}
-                          onChange={(value) => handleBetSelectionChange(market.id, value)}
-                          placeholder={
-                            market.betType === 'podium' ? 'Select top 3 riders...' :
-                            market.betType === 'top5' ? 'Select top 5 riders...' :
-                            market.betType === 'fastest-lap' ? 'Select rider...' :
-                            market.betType === 'pole-position' ? 'Select rider...' :
-                            'Select rider...'
-                          }
-                          disabled={isClosed || submitting[market.id] || loadingBets}
-                          multiple={market.betType === 'podium' || market.betType === 'top5'}
-                          maxSelections={market.betType === 'podium' ? 3 : market.betType === 'top5' ? 5 : 1}
-                        />
-                        <label className="absolute -top-2 left-3 bg-background px-2 text-[10px] font-mono text-outline uppercase z-10">
-                          {market.betType === 'podium' ? 'Top 3 Riders' :
-                           market.betType === 'top5' ? 'Top 5 Riders' :
-                           'Your Prediction'}
-                        </label>
-                      </div>
-
-                      {/* Amount Input */}
-                      <div className="relative">
-                        <span className={`absolute left-4 top-1/2 -translate-y-1/2 font-mono text-${colorClass} font-bold`}>
-                          PC
-                        </span>
-                        <input
-                          className={`w-full bg-surface-container-lowest border border-outline-variant/30 rounded-lg py-4 pl-12 pr-4 font-mono text-xl text-on-surface focus:ring-2 focus:ring-${colorClass}/50 focus:border-${colorClass} outline-none transition-all`}
-                          max="500"
-                          min="50"
-                          placeholder="0.00"
-                          type="number"
-                          value={betAmounts[market.id] || ''}
-                          onChange={(e) => handleBetAmountChange(market.id, e.target.value)}
-                          disabled={isClosed || submitting[market.id] || loadingBets}
-                        />
-                        <label className="absolute -top-2 left-3 bg-background px-2 text-[10px] font-mono text-outline uppercase">
-                          Amount (50-500)
-                        </label>
-                      </div>
-
-                      {/* Error Message */}
-                      {errors[market.id] && (
-                        <p className="text-error text-sm font-mono">{errors[market.id]}</p>
-                      )}
-
-                      {/* Submit Button */}
-                      <button
-                        onClick={() => handlePlaceBet(market)}
-                        disabled={isClosed || submitting[market.id] || loadingBets}
-                        className={`w-full py-4 ${
-                          colorClass === 'primary'
-                            ? 'bg-primary text-on-primary'
-                            : `border border-${colorClass} text-${colorClass} hover:bg-${colorClass}/10`
-                        } font-headline text-base uppercase italic tracking-tighter rounded-lg hover:brightness-110 active:scale-95 transition-all font-bold disabled:opacity-50 disabled:cursor-not-allowed`}
-                      >
-                        {isClosed
-                          ? 'Betting Closed'
-                          : loadingBets
-                          ? 'Loading...'
-                          : submitting[market.id]
-                          ? 'Placing Bet...'
-                          : 'Lock Prediction'}
-                      </button>
-                    </div>
-                  )}
-                </div>
+                  market={market}
+                  IconComponent={IconComponent}
+                  colorClass={colorClass}
+                  odds={odds}
+                  time={time}
+                  isClosed={isClosed}
+                  userBet={userBet}
+                  isLocked={isLocked}
+                  betAmount={betAmounts[market.id]}
+                  betSelection={betSelections[market.id]}
+                  submitting={submitting[market.id]}
+                  error={errors[market.id]}
+                  loadingBets={loadingBets}
+                  onAmountChange={(e: any) => handleBetAmountChange(market.id, e.target.value)}
+                  onSelectionChange={(value: string) => handleBetSelectionChange(market.id, value)}
+                  onPlaceBet={() => handlePlaceBet(market)}
+                />
               );
             })}
 

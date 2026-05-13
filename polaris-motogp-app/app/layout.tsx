@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Anybody, Hanken_Grotesk, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth-context";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const anybody = Anybody({
   subsets: ["latin"],
@@ -36,9 +37,11 @@ export default function RootLayout({
       <body
         className={`${anybody.variable} ${hankenGrotesk.variable} ${jetbrainsMono.variable} antialiased`}
       >
-        <AuthProvider>
-          {children}
-        </AuthProvider>
+        <ErrorBoundary>
+          <AuthProvider>
+            {children}
+          </AuthProvider>
+        </ErrorBoundary>
       </body>
     </html>
   );
