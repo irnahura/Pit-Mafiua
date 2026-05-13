@@ -25,6 +25,9 @@ import {
   toggleBettingStatus,
   getSystemLogs,
   toggleUserStatus,
+  getAllBettingMarkets,
+  closeBettingMarket,
+  finalizeMarketResults,
 } from "@/lib/firestore";
 
 export default function RaceControlAdmin() {
@@ -38,6 +41,9 @@ export default function RaceControlAdmin() {
   const [bettorsCount, setBettorsCount] = useState(0);
   const [systemLogs, setSystemLogs] = useState<any[]>([]);
   const [searchFilter, setSearchFilter] = useState("");
+  const [allMarkets, setAllMarkets] = useState<any[]>([]);
+  const [selectedMarket, setSelectedMarket] = useState<string>("");
+  const [winningSelection, setWinningSelection] = useState<string>("");
 
   // Form states
   const [betName, setBetName] = useState("");
@@ -64,17 +70,19 @@ export default function RaceControlAdmin() {
 
   const loadAdminData = async () => {
     try {
-      const [bettors, liquidity, count, logs] = await Promise.all([
+      const [bettors, liquidity, count, logs, markets] = await Promise.all([
         getAllActiveBettors(),
         getTotalPoolLiquidity(),
         getActiveBettorsCount(),
         getSystemLogs(5),
+        getAllBettingMarkets(),
       ]);
 
       setActiveBettors(bettors);
       setPoolLiquidity(liquidity);
       setBettorsCount(count);
       setSystemLogs(logs);
+      setAllMarkets(markets);
     } catch (error) {
       console.error("Error loading admin data:", error);
     }
@@ -153,6 +161,41 @@ export default function RaceControlAdmin() {
       loadAdminData();
     } catch (error) {
       alert("Error updating user status");
+    }
+  };
+
+  const handleCloseMarket = async (marketId: string) => {
+    if (!confirm("Are you sure you want to close this betting market?")) return;
+    
+    try {
+      await closeBettingMarket(marketId);
+      alert("Market closed successfully!");
+      loadAdminData();
+    } catch (error) {
+      alert("Error closing market");
+      console.error(error);
+    }
+  };
+
+  const handleFinalizeMarket = async () => {
+    if (!selectedMarket || !winningSelection.trim()) {
+      alert("Please select a market and enter the winning selection");
+      return;
+    }
+
+    if (!confirm(`Finalize results for this market?\n\nWinning Selection: ${winningSelection}\n\nOnly the FIRST bet with this selection will win!`)) {
+      return;
+    }
+
+    try {
+      const result = await finalizeMarketResults(selectedMarket, winningSelection);
+      alert(`Results finalized! ${result.winnersCount} winner(s) paid out.`);
+      setSelectedMarket("");
+      setWinningSelection("");
+      loadAdminData();
+    } catch (error: any) {
+      alert(`Error finalizing results: ${error.message}`);
+      console.error(error);
     }
   };
 
@@ -593,6 +636,139 @@ export default function RaceControlAdmin() {
 
         {/* System Visualization */}
         <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Betting Markets Management */}
+          <div className="glass-panel rounded-xl overflow-hidden md:col-span-2">
+            <div className="bg-surface-container-highest px-6 py-4 border-b border-outline-variant/30 flex justify-between items-center">
+              <h2 className="font-headline text-xl text-on-surface uppercase font-bold">
+                Betting Markets Control
+              </h2>
+              <span className="font-mono text-[12px] text-primary">
+                {allMarkets.length} TOTAL MARKETS
+              </span>
+            </div>
+            <div className="p-6 space-y-6">
+              {/* Markets Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {allMarkets.length > 0 ? (
+                  allMarkets.map((market) => (
+                    <div
+                      key={market.id}
+                      className={`glass-card p-4 rounded-lg border-l-4 ${
+                        market.status === 'open'
+                          ? 'border-l-tertiary'
+                          : market.status === 'closed'
+                          ? 'border-l-error'
+                          : 'border-l-secondary'
+                      }`}
+                    >
+                      <div className="flex justify-between items-start mb-3">
+                        <div>
+                          <h3 className="font-headline text-lg text-on-surface font-bold">
+                            {market.betName}
+                          </h3>
+                          <p className="text-on-surface-variant text-[12px] font-mono uppercase mt-1">
+                            {market.status}
+                          </p>
+                        </div>
+                        <span className="bg-primary/20 text-primary font-mono text-sm px-2 py-1 rounded font-bold">
+                          {market.odds || 2.5}X
+                        </span>
+                      </div>
+                      <p className="text-on-surface-variant text-sm mb-4 line-clamp-2">
+                        {market.summary}
+                      </p>
+                      <div className="flex gap-2">
+                        {market.status === 'open' && (
+                          <button
+                            onClick={() => handleCloseMarket(market.id)}
+                            className="flex-1 bg-error/20 text-error border border-error/30 font-mono text-[10px] uppercase py-2 rounded hover:bg-error/30 transition-colors"
+                          >
+                            Close
+                          </button>
+                        )}
+                        {market.status === 'closed' && (
+                          <button
+                            onClick={() => setSelectedMarket(market.id)}
+                            className={`flex-1 ${
+                              selectedMarket === market.id
+                                ? 'bg-tertiary text-on-tertiary'
+                                : 'bg-tertiary/20 text-tertiary border border-tertiary/30'
+                            } font-mono text-[10px] uppercase py-2 rounded hover:bg-tertiary/30 transition-colors`}
+                          >
+                            {selectedMarket === market.id ? 'Selected' : 'Select'}
+                          </button>
+                        )}
+                        {market.status === 'finalized' && (
+                          <div className="flex-1 bg-secondary/20 text-secondary border border-secondary/30 font-mono text-[10px] uppercase py-2 rounded text-center">
+                            Finalized
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="col-span-full text-center py-8 text-on-surface-variant">
+                    No betting markets created yet
+                  </div>
+                )}
+              </div>
+
+              {/* Finalize Results Section */}
+              {selectedMarket && (
+                <div className="glass-card p-6 rounded-lg border-l-4 border-l-tertiary">
+                  <h3 className="font-headline text-lg text-on-surface font-bold mb-4">
+                    Finalize Results
+                  </h3>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="font-mono text-[12px] text-on-surface-variant uppercase block mb-2">
+                        Selected Market
+                      </label>
+                      <div className="bg-surface-container-lowest border border-outline-variant/50 rounded-lg px-4 py-3 text-on-surface">
+                        {allMarkets.find(m => m.id === selectedMarket)?.betName || 'Unknown'}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="font-mono text-[12px] text-on-surface-variant uppercase block mb-2">
+                        Winning Selection
+                      </label>
+                      <input
+                        value={winningSelection}
+                        onChange={(e) => setWinningSelection(e.target.value)}
+                        className="w-full bg-surface-container-lowest border border-outline-variant/50 rounded-lg px-4 py-3 text-on-surface focus:border-tertiary focus:ring-1 focus:ring-tertiary outline-none transition-all"
+                        placeholder="Enter the winning prediction (e.g., Jorge Martin)"
+                        type="text"
+                      />
+                    </div>
+                    <div className="bg-tertiary/10 border border-tertiary/30 rounded-lg p-4">
+                      <p className="text-tertiary text-sm font-mono">
+                        ⚠️ FIRST-BET-WINS RULE: Only the earliest bet with this selection will win. All other bets will be marked as lost.
+                      </p>
+                    </div>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={handleFinalizeMarket}
+                        className="flex-1 bg-tertiary text-on-tertiary font-headline text-lg py-3 rounded-lg hover:brightness-110 active:scale-95 transition-all font-bold"
+                      >
+                        FINALIZE & PAY WINNER
+                      </button>
+                      <button
+                        onClick={() => {
+                          setSelectedMarket("");
+                          setWinningSelection("");
+                        }}
+                        className="px-6 bg-surface-container-low text-on-surface border border-outline-variant/30 font-mono text-sm rounded-lg hover:bg-surface-container transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Original visualization panels */}
           <div className="glass-panel p-6 rounded-xl space-y-4">
             <div className="flex justify-between items-center">
               <h3 className="font-mono text-[12px] text-on-surface uppercase tracking-widest">

@@ -49,6 +49,7 @@ export const logBet = async (userId: string, betData: {
   odds: number;
   potentialReturn: number;
   raceEvent: string;
+  marketId?: string; // Add marketId to track which market the bet is for
 }) => {
   try {
     const database = getDb();
@@ -60,6 +61,21 @@ export const logBet = async (userId: string, betData: {
     }
     if (betData.stakeAmount > MAX_BET_AMOUNT) {
       throw new Error(`Maximum bet amount is ${MAX_BET_AMOUNT} PitCoins`);
+    }
+
+    // Check if user already has an active bet on this market
+    if (betData.marketId) {
+      const existingBetQuery = query(
+        collection(database, 'bets'),
+        where('userId', '==', userId),
+        where('marketId', '==', betData.marketId),
+        where('status', '==', 'pending')
+      );
+      const existingBetSnapshot = await getDocs(existingBetQuery);
+      
+      if (!existingBetSnapshot.empty) {
+        throw new Error('You already have an active bet on this market. Wait for it to end before placing another bet.');
+      }
     }
 
     // First, get user's current balance
@@ -81,6 +97,7 @@ export const logBet = async (userId: string, betData: {
     // Create bet record with submission timestamp for tie-breaker
     const betRef = await addDoc(collection(database, 'bets'), {
       userId,
+      marketId: betData.marketId || null,
       marketType: betData.marketType,
       selection: betData.selection,
       stakeAmount: betData.stakeAmount,
@@ -606,6 +623,213 @@ export const getActiveBettingMarkets = async () => {
   } catch (error) {
     console.error('✗ Error fetching betting markets:', error);
     return [];
+  }
+};
+
+// Get ALL betting markets (for admin panel)
+export const getAllBettingMarkets = async () => {
+  try {
+    const database = getDb();
+    if (!database) return [];
+
+    const marketsRef = collection(database, 'betting_markets');
+    const querySnapshot = await getDocs(marketsRef);
+
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+  } catch (error) {
+    console.error('✗ Error fetching all betting markets:', error);
+    return [];
+  }
+};
+
+// Check if user has active bet on a specific market
+export const checkUserHasActiveBet = async (userId: string, marketId: string): Promise<boolean> => {
+  try {
+    const database = getDb();
+    if (!database) return false;
+
+    const betsQuery = query(
+      collection(database, 'bets'),
+      where('userId', '==', userId),
+      where('marketId', '==', marketId),
+      where('status', '==', 'pending')
+    );
+    const querySnapshot = await getDocs(betsQuery);
+
+    return !querySnapshot.empty;
+  } catch (error) {
+    console.error('✗ Error checking user bet:', error);
+    return false;
+  }
+};
+
+// Get user's active bet on a specific market
+export const getUserActiveBet = async (userId: string, marketId: string) => {
+  try {
+    const database = getDb();
+    if (!database) return null;
+
+    const betsQuery = query(
+      collection(database, 'bets'),
+      where('userId', '==', userId),
+      where('marketId', '==', marketId),
+      where('status', '==', 'pending')
+    );
+    const querySnapshot = await getDocs(betsQuery);
+
+    if (!querySnapshot.empty) {
+      const betDoc = querySnapshot.docs[0];
+      return { id: betDoc.id, ...betDoc.data() };
+    }
+    return null;
+  } catch (error) {
+    console.error('✗ Error fetching user bet:', error);
+    return null;
+  }
+};
+
+// Close a specific betting market (admin only)
+export const closeBettingMarket = async (marketId: string) => {
+  try {
+    const database = getDb();
+    if (!database) throw new Error('Firestore not initialized');
+
+    const marketRef = doc(database, 'betting_markets', marketId);
+    await updateDoc(marketRef, {
+      status: 'closed',
+      closedAt: serverTimestamp(),
+    });
+
+    console.log('✓ Betting market closed:', marketId);
+    return { success: true };
+  } catch (error) {
+    console.error('✗ Error closing betting market:', error);
+    throw error;
+  }
+};
+
+// Finalize specific market results with first-bet-wins logic (admin only)
+export const finalizeMarketResults = async (marketId: string, winningSelection: string) => {
+  try {
+    const database = getDb();
+    if (!database) throw new Error('Firestore not initialized');
+
+    // Find all bets for this market with the winning selection
+    const betsQuery = query(
+      collection(database, 'bets'),
+      where('marketId', '==', marketId),
+      where('selection', '==', winningSelection),
+      where('status', '==', 'pending')
+    );
+    const querySnapshot = await getDocs(betsQuery);
+
+    if (querySnapshot.empty) {
+      console.log('No winning bets found for this selection');
+      
+      // Mark all bets as lost
+      const allBetsQuery = query(
+        collection(database, 'bets'),
+        where('marketId', '==', marketId),
+        where('status', '==', 'pending')
+      );
+      const allBetsSnapshot = await getDocs(allBetsQuery);
+
+      const losingBetsPromises = allBetsSnapshot.docs.map(async (betDoc) => {
+        await updateDoc(betDoc.ref, {
+          status: 'lost',
+          updatedAt: serverTimestamp(),
+        });
+      });
+
+      await Promise.all(losingBetsPromises);
+
+      // Update market status
+      const marketRef = doc(database, 'betting_markets', marketId);
+      await updateDoc(marketRef, {
+        status: 'finalized',
+        winningSelection,
+        finalizedAt: serverTimestamp(),
+      });
+
+      return { success: true, winnersCount: 0 };
+    }
+
+    // FIRST-BET-WINS LOGIC: Sort by submission time and get the earliest bet
+    const winningBets = querySnapshot.docs
+      .map(doc => ({ id: doc.id, ref: doc.ref, ...doc.data() }))
+      .sort((a: any, b: any) => {
+        const timeA = a.submissionTime || a.createdAt?.toMillis?.() || 0;
+        const timeB = b.submissionTime || b.createdAt?.toMillis?.() || 0;
+        return timeA - timeB;
+      });
+
+    // Only the FIRST bet wins
+    const firstWinningBet = winningBets[0];
+    const userId = firstWinningBet.userId;
+    const winnings = firstWinningBet.potentialReturn;
+
+    // Update the winning bet
+    await updateDoc(firstWinningBet.ref, {
+      status: 'won',
+      updatedAt: serverTimestamp(),
+    });
+
+    // Get user and add winnings
+    const userQuery = query(collection(database, 'users'), where('userId', '==', userId));
+    const userSnapshot = await getDocs(userQuery);
+
+    if (!userSnapshot.empty) {
+      const userDoc = userSnapshot.docs[0];
+      const currentBalance = userDoc.data().pitcoinBalance || 0;
+
+      await updateDoc(userDoc.ref, {
+        pitcoinBalance: currentBalance + winnings,
+        totalEarnings: (userDoc.data().totalEarnings || 0) + winnings,
+        totalWins: (userDoc.data().totalWins || 0) + 1,
+      });
+    }
+
+    // Mark all other bets (including other correct predictions) as lost
+    const losingBetsPromises = winningBets.slice(1).map(async (bet: any) => {
+      await updateDoc(bet.ref, {
+        status: 'lost',
+        updatedAt: serverTimestamp(),
+      });
+    });
+
+    // Also mark bets with wrong predictions as lost
+    const wrongBetsQuery = query(
+      collection(database, 'bets'),
+      where('marketId', '==', marketId),
+      where('status', '==', 'pending')
+    );
+    const wrongBetsSnapshot = await getDocs(wrongBetsQuery);
+
+    const wrongBetsPromises = wrongBetsSnapshot.docs.map(async (betDoc) => {
+      await updateDoc(betDoc.ref, {
+        status: 'lost',
+        updatedAt: serverTimestamp(),
+      });
+    });
+
+    await Promise.all([...losingBetsPromises, ...wrongBetsPromises]);
+
+    // Update market status
+    const marketRef = doc(database, 'betting_markets', marketId);
+    await updateDoc(marketRef, {
+      status: 'finalized',
+      winningSelection,
+      finalizedAt: serverTimestamp(),
+    });
+
+    console.log('✓ Market results finalized. First bet wins!');
+    return { success: true, winnersCount: 1, winnerUserId: userId };
+  } catch (error) {
+    console.error('✗ Error finalizing market results:', error);
+    throw error;
   }
 };
 

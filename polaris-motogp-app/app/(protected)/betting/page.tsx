@@ -1,10 +1,10 @@
 "use client";
 
-import { Trophy, Timer, AlertTriangle, Gauge, Car, Thermometer, Wind, CloudSnow, Target, Zap } from "lucide-react";
+import { Trophy, Timer, AlertTriangle, Gauge, Car, Thermometer, Wind, CloudSnow, Target, Zap, Lock } from "lucide-react";
 import { useUserBalance } from "@/hooks/useUserData";
 import { useAuth } from "@/lib/auth-context";
 import { useBettingMarkets } from "@/hooks/useBettingMarkets";
-import { logBet } from "@/lib/firestore";
+import { logBet, getUserActiveBet } from "@/lib/firestore";
 import { useState, useEffect } from "react";
 
 // Icon mapping for different bet types
@@ -35,6 +35,40 @@ export default function BettingArena() {
   const [submitting, setSubmitting] = useState<Record<string, boolean>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [timeRemaining, setTimeRemaining] = useState<Record<string, number>>({});
+  const [userActiveBets, setUserActiveBets] = useState<Record<string, any>>({});
+  const [loadingBets, setLoadingBets] = useState(true);
+
+  // Check for user's active bets on each market
+  useEffect(() => {
+    const checkUserBets = async () => {
+      if (!user || markets.length === 0) {
+        setLoadingBets(false);
+        return;
+      }
+
+      try {
+        const betsPromises = markets.map(market => 
+          getUserActiveBet(user.uid, market.id)
+        );
+        const betsResults = await Promise.all(betsPromises);
+        
+        const betsMap: Record<string, any> = {};
+        markets.forEach((market, index) => {
+          if (betsResults[index]) {
+            betsMap[market.id] = betsResults[index];
+          }
+        });
+        
+        setUserActiveBets(betsMap);
+      } catch (error) {
+        console.error('Error checking user bets:', error);
+      } finally {
+        setLoadingBets(false);
+      }
+    };
+
+    checkUserBets();
+  }, [user, markets]);
 
   // Calculate time remaining for each market
   useEffect(() => {
@@ -80,6 +114,12 @@ export default function BettingArena() {
       return;
     }
 
+    // Check if user already has an active bet on this market
+    if (userActiveBets[market.id]) {
+      setErrors(prev => ({ ...prev, [market.id]: 'You already have an active bet on this market' }));
+      return;
+    }
+
     const amount = parseFloat(betAmounts[market.id] || '0');
     const selection = betSelections[market.id];
 
@@ -113,6 +153,7 @@ export default function BettingArena() {
       const potentialReturn = amount * odds;
 
       await logBet(user.uid, {
+        marketId: market.id, // Pass marketId for locking
         marketType: market.betName,
         selection: selection,
         stakeAmount: amount,
@@ -124,6 +165,10 @@ export default function BettingArena() {
       // Clear form
       setBetAmounts(prev => ({ ...prev, [market.id]: '' }));
       setBetSelections(prev => ({ ...prev, [market.id]: '' }));
+      
+      // Mark this market as having an active bet
+      const newBet = await getUserActiveBet(user.uid, market.id);
+      setUserActiveBets(prev => ({ ...prev, [market.id]: newBet }));
       
       // Refresh balance
       await refreshBalance();
@@ -286,26 +331,37 @@ export default function BettingArena() {
               const odds = market.odds || 2.5;
               const time = formatTimeRemaining(timeRemaining[market.id] || 0);
               const isClosed = (timeRemaining[market.id] || 0) <= 0;
+              const userBet = userActiveBets[market.id];
+              const isLocked = !!userBet;
 
               return (
                 <div
                   key={market.id}
                   className={`glass-card group hover:border-${colorClass}/50 transition-all duration-300 p-6 rounded-xl flex flex-col justify-between ${
-                    isClosed ? 'opacity-50' : ''
+                    isClosed || isLocked ? 'opacity-75' : ''
                   }`}
                 >
                   <div>
                     <div className="flex justify-between items-start mb-6">
                       <div className={`w-12 h-12 rounded-lg bg-${colorClass}/10 flex items-center justify-center border border-${colorClass}/20`}>
-                        <IconComponent className={`text-${colorClass} w-6 h-6`} />
+                        {isLocked ? (
+                          <Lock className={`text-${colorClass} w-6 h-6`} />
+                        ) : (
+                          <IconComponent className={`text-${colorClass} w-6 h-6`} />
+                        )}
                       </div>
                       <div className="flex flex-col items-end gap-1">
                         <span className={`bg-${colorClass}/20 text-${colorClass} font-mono text-xl px-3 py-1 rounded-full font-bold`}>
                           {odds}X
                         </span>
-                        {!isClosed && (
+                        {!isClosed && !isLocked && (
                           <span className="text-on-surface-variant font-mono text-[10px]">
                             {time.hours}h {time.minutes}m
+                          </span>
+                        )}
+                        {isLocked && (
+                          <span className="text-tertiary font-mono text-[10px] uppercase">
+                            Locked
                           </span>
                         )}
                       </div>
@@ -317,64 +373,99 @@ export default function BettingArena() {
                       {market.summary}
                     </p>
                   </div>
-                  <div className="space-y-4">
-                    {/* Prediction Input */}
-                    <div className="relative">
-                      <input
-                        className="w-full bg-surface-container-lowest border border-outline-variant/30 rounded-lg py-3 px-4 text-on-surface focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-all"
-                        placeholder="Enter your prediction..."
-                        type="text"
-                        value={betSelections[market.id] || ''}
-                        onChange={(e) => handleBetSelectionChange(market.id, e.target.value)}
-                        disabled={isClosed || submitting[market.id]}
-                      />
-                      <label className="absolute -top-2 left-3 bg-background px-2 text-[10px] font-mono text-outline uppercase">
-                        Your Prediction
-                      </label>
+
+                  {/* Show locked bet info */}
+                  {isLocked && userBet && (
+                    <div className="space-y-3 bg-surface-container-highest/50 p-4 rounded-lg border border-tertiary/30">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Lock className="w-4 h-4 text-tertiary" />
+                        <span className="font-mono text-[12px] text-tertiary uppercase font-bold">
+                          Your Active Bet
+                        </span>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex justify-between">
+                          <span className="text-on-surface-variant text-sm">Prediction:</span>
+                          <span className="text-on-surface font-semibold">{userBet.selection}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-on-surface-variant text-sm">Stake:</span>
+                          <span className="text-primary font-mono font-bold">{userBet.stakeAmount} PC</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-on-surface-variant text-sm">Potential Return:</span>
+                          <span className="text-tertiary font-mono font-bold">{userBet.potentialReturn?.toLocaleString()} PC</span>
+                        </div>
+                      </div>
+                      <p className="text-on-surface-variant text-[10px] font-mono mt-3 text-center">
+                        Wait for this bet to end before placing another
+                      </p>
                     </div>
+                  )}
 
-                    {/* Amount Input */}
-                    <div className="relative">
-                      <span className={`absolute left-4 top-1/2 -translate-y-1/2 font-mono text-${colorClass} font-bold`}>
-                        PC
-                      </span>
-                      <input
-                        className={`w-full bg-surface-container-lowest border border-outline-variant/30 rounded-lg py-4 pl-12 pr-4 font-mono text-xl text-on-surface focus:ring-2 focus:ring-${colorClass}/50 focus:border-${colorClass} outline-none transition-all`}
-                        max="500"
-                        min="50"
-                        placeholder="0.00"
-                        type="number"
-                        value={betAmounts[market.id] || ''}
-                        onChange={(e) => handleBetAmountChange(market.id, e.target.value)}
-                        disabled={isClosed || submitting[market.id]}
-                      />
-                      <label className="absolute -top-2 left-3 bg-background px-2 text-[10px] font-mono text-outline uppercase">
-                        Amount (50-500)
-                      </label>
+                  {/* Show betting form if not locked */}
+                  {!isLocked && (
+                    <div className="space-y-4">
+                      {/* Prediction Input */}
+                      <div className="relative">
+                        <input
+                          className="w-full bg-surface-container-lowest border border-outline-variant/30 rounded-lg py-3 px-4 text-on-surface focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-all"
+                          placeholder="Enter your prediction..."
+                          type="text"
+                          value={betSelections[market.id] || ''}
+                          onChange={(e) => handleBetSelectionChange(market.id, e.target.value)}
+                          disabled={isClosed || submitting[market.id] || loadingBets}
+                        />
+                        <label className="absolute -top-2 left-3 bg-background px-2 text-[10px] font-mono text-outline uppercase">
+                          Your Prediction
+                        </label>
+                      </div>
+
+                      {/* Amount Input */}
+                      <div className="relative">
+                        <span className={`absolute left-4 top-1/2 -translate-y-1/2 font-mono text-${colorClass} font-bold`}>
+                          PC
+                        </span>
+                        <input
+                          className={`w-full bg-surface-container-lowest border border-outline-variant/30 rounded-lg py-4 pl-12 pr-4 font-mono text-xl text-on-surface focus:ring-2 focus:ring-${colorClass}/50 focus:border-${colorClass} outline-none transition-all`}
+                          max="500"
+                          min="50"
+                          placeholder="0.00"
+                          type="number"
+                          value={betAmounts[market.id] || ''}
+                          onChange={(e) => handleBetAmountChange(market.id, e.target.value)}
+                          disabled={isClosed || submitting[market.id] || loadingBets}
+                        />
+                        <label className="absolute -top-2 left-3 bg-background px-2 text-[10px] font-mono text-outline uppercase">
+                          Amount (50-500)
+                        </label>
+                      </div>
+
+                      {/* Error Message */}
+                      {errors[market.id] && (
+                        <p className="text-error text-sm font-mono">{errors[market.id]}</p>
+                      )}
+
+                      {/* Submit Button */}
+                      <button
+                        onClick={() => handlePlaceBet(market)}
+                        disabled={isClosed || submitting[market.id] || loadingBets}
+                        className={`w-full py-4 ${
+                          colorClass === 'primary'
+                            ? 'bg-primary text-on-primary'
+                            : `border border-${colorClass} text-${colorClass} hover:bg-${colorClass}/10`
+                        } font-headline text-base uppercase italic tracking-tighter rounded-lg hover:brightness-110 active:scale-95 transition-all font-bold disabled:opacity-50 disabled:cursor-not-allowed`}
+                      >
+                        {isClosed
+                          ? 'Betting Closed'
+                          : loadingBets
+                          ? 'Loading...'
+                          : submitting[market.id]
+                          ? 'Placing Bet...'
+                          : 'Lock Prediction'}
+                      </button>
                     </div>
-
-                    {/* Error Message */}
-                    {errors[market.id] && (
-                      <p className="text-error text-sm font-mono">{errors[market.id]}</p>
-                    )}
-
-                    {/* Submit Button */}
-                    <button
-                      onClick={() => handlePlaceBet(market)}
-                      disabled={isClosed || submitting[market.id]}
-                      className={`w-full py-4 ${
-                        colorClass === 'primary'
-                          ? 'bg-primary text-on-primary'
-                          : `border border-${colorClass} text-${colorClass} hover:bg-${colorClass}/10`
-                      } font-headline text-base uppercase italic tracking-tighter rounded-lg hover:brightness-110 active:scale-95 transition-all font-bold disabled:opacity-50 disabled:cursor-not-allowed`}
-                    >
-                      {isClosed
-                        ? 'Betting Closed'
-                        : submitting[market.id]
-                        ? 'Placing Bet...'
-                        : 'Lock Prediction'}
-                    </button>
-                  </div>
+                  )}
                 </div>
               );
             })}
