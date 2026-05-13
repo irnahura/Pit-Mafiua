@@ -303,12 +303,6 @@ export default function BettingArena() {
       return;
     }
 
-    // Check if user already has an active bet on this market
-    if (userActiveBets[market.id]) {
-      setErrors(prev => ({ ...prev, [market.id]: 'You already have an active bet on this market' }));
-      return;
-    }
-
     const amount = parseFloat(betAmounts[market.id] || '0');
     const selection = betSelections[market.id];
 
@@ -342,7 +336,7 @@ export default function BettingArena() {
       const potentialReturn = amount * odds;
 
       await logBet(user.uid, {
-        marketId: market.id, // Pass marketId for locking
+        marketId: market.id,
         marketType: market.betName,
         betType: market.betType || 'race-winner',
         selection: selection,
@@ -356,7 +350,7 @@ export default function BettingArena() {
       setBetAmounts(prev => ({ ...prev, [market.id]: '' }));
       setBetSelections(prev => ({ ...prev, [market.id]: '' }));
       
-      // Mark this market as having an active bet
+      // Refresh user's active bets
       const newBet = await getUserActiveBet(user.uid, market.id);
       setUserActiveBets(prev => ({ ...prev, [market.id]: newBet }));
       
@@ -364,13 +358,18 @@ export default function BettingArena() {
       await refreshBalance();
 
       trackAction('bet_placed', { marketId: market.id, amount, selection }, user.uid);
-      alert(`Bet placed successfully! Potential return: ${potentialReturn.toLocaleString()} PC`);
+      alert(`Bet placed successfully! Potential return: ${potentialReturn.toLocaleString()} PC\n\nYou can place another bet in 10 seconds.`);
     } catch (error: any) {
-      setErrors(prev => ({ ...prev, [market.id]: error.message || 'Failed to place bet' }));
+      // Handle rate limit error specially
+      if (error.message.includes('wait') && error.message.includes('seconds')) {
+        setErrors(prev => ({ ...prev, [market.id]: error.message }));
+      } else {
+        setErrors(prev => ({ ...prev, [market.id]: error.message || 'Failed to place bet' }));
+      }
     } finally {
       setSubmitting(prev => ({ ...prev, [market.id]: false }));
     }
-  }, [user, betAmounts, betSelections, balance, userActiveBets, refreshBalance]);
+  }, [user, betAmounts, betSelections, balance, refreshBalance]);
 
   const getIconComponent = useCallback((iconName: string) => {
     return iconMap[iconName?.toLowerCase()] || Trophy;
@@ -529,7 +528,8 @@ export default function BettingArena() {
               // Check both time AND status field - admin can override time-based closing
               const isClosed = market.status === 'closed' || market.status === 'finalized' || ((timeRemaining[market.id] || 0) <= 0 && market.status !== 'open');
               const userBet = userActiveBets[market.id];
-              const isLocked = !!userBet;
+              // Users can now place multiple bets - no locking
+              const isLocked = false;
 
               return (
                 <BettingCard
