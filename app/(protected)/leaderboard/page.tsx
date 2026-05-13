@@ -23,7 +23,7 @@ export default function Leaderboard() {
           <div className="flex items-center gap-2 ml-4 px-3 py-1 bg-tertiary/10 rounded-full border border-tertiary/30">
             <span className="w-2 h-2 bg-tertiary rounded-full animate-pulse"></span>
             <span className="font-mono text-[10px] text-tertiary uppercase">
-              Live • Updates Every 5s
+              Live • Updates Every 1 Min
             </span>
           </div>
         </div>
@@ -222,7 +222,7 @@ export default function Leaderboard() {
           {/* Footer Pagination */}
           <div className="bg-surface-container-lowest/80 px-8 py-4 flex justify-between items-center border-t border-outline-variant/20">
             <span className="font-mono text-[12px] text-on-surface-variant">
-              Showing All {leaderboard.length} Players • Updates Every 5 Seconds
+              Showing All {leaderboard.length} Players • Updates Every 1 Minute
             </span>
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 bg-tertiary rounded-full animate-pulse"></span>

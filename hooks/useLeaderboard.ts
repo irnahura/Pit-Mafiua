@@ -41,8 +41,8 @@ export function useLeaderboard(limit: number = 1000) {
 
     fetchLeaderboard();
 
-    // Refresh leaderboard every 5 seconds for real-time updates
-    const interval = setInterval(fetchLeaderboard, 5000);
+    // Refresh leaderboard every 1 minute (60 seconds)
+    const interval = setInterval(fetchLeaderboard, 60000);
 
     return () => clearInterval(interval);
   }, [limit]);
