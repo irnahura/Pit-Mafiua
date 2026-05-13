@@ -224,19 +224,28 @@ export default function RaceControlAdmin() {
       return;
     }
 
-    if (!confirm(`Finalize results for this market?\n\nWinning Selection: ${winningSelection}\n\nOnly the FIRST bet with this selection will win!`)) {
+    const selectedMarketData = allMarkets.find(m => m.id === selectedMarket);
+    const marketName = selectedMarketData?.betName || 'Unknown Market';
+
+    if (!confirm(`⚠️ FINALIZE MARKET RESULTS\n\nMarket: ${marketName}\nWinning Team: ${winningSelection}\n\n🏆 FIRST-BET-WINS ALGORITHM:\n• Only the EARLIEST bet with this team wins\n• Winner gets full payout (stake × odds)\n• All other bets are marked as LOST\n\nThis action CANNOT be undone!\n\nProceed?`)) {
       return;
     }
 
     try {
       const result = await finalizeMarketResults(selectedMarket, winningSelection);
-      alert(`Results finalized! ${result.winnersCount} winner(s) paid out.`);
+      
+      if (result.winnersCount === 0) {
+        alert(`✅ Market Finalized!\n\n❌ No Winners Found\n\nNo bets matched the winning selection: "${winningSelection}"\nAll bets have been marked as lost.`);
+      } else {
+        alert(`✅ Market Finalized Successfully!\n\n🏆 Winner: User ${result.winnerUserId?.slice(0, 8)}...\n💰 Payout: ${selectedMarketData?.odds || 2.5}x odds\n\nWinner's account has been credited.\nAll other bets marked as lost.`);
+      }
+      
       setSelectedMarket("");
       setWinningSelection("");
       loadAdminData();
     } catch (error: any) {
-      alert(`Error finalizing results: ${error.message}`);
-      console.error(error);
+      alert(`❌ Error Finalizing Results\n\n${error.message}\n\nPlease check:\n• Market is closed\n• Winning team name is correct\n• You have admin permissions`);
+      console.error('Finalization error:', error);
     }
   };
 
@@ -825,6 +834,52 @@ export default function RaceControlAdmin() {
                         {allMarkets.find(m => m.id === selectedMarket)?.betName || 'Unknown'}
                       </div>
                     </div>
+                    
+                    {/* Team Names Reference */}
+                    <div className="bg-tertiary/10 border border-tertiary/30 rounded-lg p-4">
+                      <p className="text-tertiary text-[10px] font-mono uppercase mb-2">
+                        📋 Valid Team Names (copy exactly):
+                      </p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          onClick={() => setWinningSelection('APEX 5')}
+                          className="text-left bg-surface-container-lowest hover:bg-tertiary/20 border border-outline-variant/30 rounded px-2 py-1 text-on-surface font-mono text-sm transition-colors"
+                        >
+                          APEX 5
+                        </button>
+                        <button
+                          onClick={() => setWinningSelection('FORCE-BLR')}
+                          className="text-left bg-surface-container-lowest hover:bg-tertiary/20 border border-outline-variant/30 rounded px-2 py-1 text-on-surface font-mono text-sm transition-colors"
+                        >
+                          FORCE-BLR
+                        </button>
+                        <button
+                          onClick={() => setWinningSelection('MAREVICKS')}
+                          className="text-left bg-surface-container-lowest hover:bg-tertiary/20 border border-outline-variant/30 rounded px-2 py-1 text-on-surface font-mono text-sm transition-colors"
+                        >
+                          MAREVICKS
+                        </button>
+                        <button
+                          onClick={() => setWinningSelection('ORION')}
+                          className="text-left bg-surface-container-lowest hover:bg-tertiary/20 border border-outline-variant/30 rounded px-2 py-1 text-on-surface font-mono text-sm transition-colors"
+                        >
+                          ORION
+                        </button>
+                        <button
+                          onClick={() => setWinningSelection('SKIBDI RACER')}
+                          className="text-left bg-surface-container-lowest hover:bg-tertiary/20 border border-outline-variant/30 rounded px-2 py-1 text-on-surface font-mono text-sm transition-colors"
+                        >
+                          SKIBDI RACER
+                        </button>
+                        <button
+                          onClick={() => setWinningSelection('THEONEPEICEISREAL')}
+                          className="text-left bg-surface-container-lowest hover:bg-tertiary/20 border border-outline-variant/30 rounded px-2 py-1 text-on-surface font-mono text-sm transition-colors"
+                        >
+                          THEONEPEICEISREAL
+                        </button>
+                      </div>
+                    </div>
+                    
                     <div>
                       <label className="font-mono text-[12px] text-on-surface-variant uppercase block mb-2">
                         Winning Selection
@@ -833,14 +888,20 @@ export default function RaceControlAdmin() {
                         value={winningSelection}
                         onChange={(e) => setWinningSelection(e.target.value)}
                         className="w-full bg-surface-container-lowest border border-outline-variant/50 rounded-lg px-4 py-3 text-on-surface focus:border-tertiary focus:ring-1 focus:ring-tertiary outline-none transition-all"
-                        placeholder="Enter the winning prediction (e.g., Jorge Martin)"
+                        placeholder="Enter the winning team name (e.g., APEX 5)"
                         type="text"
                       />
                     </div>
-                    <div className="bg-tertiary/10 border border-tertiary/30 rounded-lg p-4">
-                      <p className="text-tertiary text-sm font-mono">
-                        ⚠️ FIRST-BET-WINS RULE: Only the earliest bet with this selection will win. All other bets will be marked as lost.
+                    <div className="bg-error/10 border border-error/30 rounded-lg p-4">
+                      <p className="text-error text-sm font-mono mb-2">
+                        ⚠️ FIRST-BET-WINS ALGORITHM
                       </p>
+                      <ul className="text-error text-[11px] font-mono space-y-1 list-disc list-inside">
+                        <li>Only the EARLIEST bet with this team wins</li>
+                        <li>Winner receives: Stake × Odds (full payout)</li>
+                        <li>All other bets are marked as LOST</li>
+                        <li>This action CANNOT be undone</li>
+                      </ul>
                     </div>
                     <div className="flex gap-3">
                       <button
