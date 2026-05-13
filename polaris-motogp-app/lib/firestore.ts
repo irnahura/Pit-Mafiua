@@ -698,20 +698,25 @@ export const toggleUserStatus = async (userId: string, status: 'active' | 'suspe
   }
 };
 
-// Get all active betting markets
+// Get all active betting markets (open or closed, but not finalized/deleted)
 export const getActiveBettingMarkets = async () => {
   try {
     const database = getDb();
     if (!database) return [];
 
     const marketsRef = collection(database, 'betting_markets');
-    const q = query(marketsRef, where('status', '==', 'open'));
-    const querySnapshot = await getDocs(q);
+    const querySnapshot = await getDocs(marketsRef);
 
-    return querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
+    // Filter out finalized and deleted markets, keep open and closed
+    return querySnapshot.docs
+      .filter(doc => {
+        const status = doc.data().status;
+        return status === 'open' || status === 'closed';
+      })
+      .map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
   } catch (error) {
     console.error('✗ Error fetching betting markets:', error);
     return [];

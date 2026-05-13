@@ -526,7 +526,8 @@ export default function BettingArena() {
               const colorClass = getColorClass(market.color || 'primary');
               const odds = market.odds || 2.5;
               const time = formatTimeRemaining(timeRemaining[market.id] || 0);
-              const isClosed = (timeRemaining[market.id] || 0) <= 0;
+              // Check both time AND status field - admin can override time-based closing
+              const isClosed = market.status === 'closed' || market.status === 'finalized' || ((timeRemaining[market.id] || 0) <= 0 && market.status !== 'open');
               const userBet = userActiveBets[market.id];
               const isLocked = !!userBet;
 
