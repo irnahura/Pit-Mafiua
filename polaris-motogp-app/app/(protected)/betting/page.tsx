@@ -113,7 +113,7 @@ const BettingCard = memo(({
           <div className="flex items-center gap-2 mb-2">
             <Lock className="w-4 h-4 text-tertiary" />
             <span className="font-mono text-[12px] text-tertiary uppercase font-bold">
-              Your Active Bet
+              Your Active Prediction
             </span>
           </div>
           <div className="space-y-2">
@@ -410,7 +410,7 @@ export default function BettingArena() {
               className="text-primary font-bold font-mono text-[10px] uppercase tracking-[0.2em]"
               href="/betting"
             >
-              Betting
+              Prediction
             </a>
             <a
               className="text-on-surface-variant font-mono text-[10px] uppercase tracking-[0.2em] hover:text-primary/80 transition-colors"
@@ -625,7 +625,7 @@ export default function BettingArena() {
           <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
             <path d="M12 2L4 5v6.09c0 5.05 3.41 9.76 8 10.91 4.59-1.15 8-5.86 8-10.91V5l-8-3z" />
           </svg>
-          <span className="font-mono text-[10px] uppercase mt-1">Betting</span>
+          <span className="font-mono text-[10px] uppercase mt-1">Prediction</span>
         </a>
         <a href="/leaderboard" className="flex flex-col items-center justify-center text-on-surface-variant/60 hover:text-primary/80">
           <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
