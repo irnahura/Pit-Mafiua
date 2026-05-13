@@ -358,7 +358,7 @@ export default function BettingArena() {
       await refreshBalance();
 
       trackAction('bet_placed', { marketId: market.id, amount, selection }, user.uid);
-      alert(`Bet placed successfully! Potential return: ${potentialReturn.toLocaleString()} PC\n\nYou can place another bet in 10 seconds.`);
+      alert(`Bet placed successfully! Potential return: ${potentialReturn.toLocaleString()} PC`);
     } catch (error: any) {
       // Handle rate limit error specially
       if (error.message.includes('wait') && error.message.includes('seconds')) {

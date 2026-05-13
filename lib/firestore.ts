@@ -137,34 +137,6 @@ export const logBet = async (userId: string, betData: {
       throw new Error(`Daily payout limit reached (${MAX_DAILY_PAYOUT_PER_USER} PC). Try again tomorrow.`);
     }
 
-    // RULE 6: Rate limiting - 10 second cooldown between bets
-    const recentBetsQuery = query(
-      collection(database, 'bets'),
-      where('userId', '==', userId)
-    );
-    const userBetsSnapshot = await getDocs(recentBetsQuery);
-    
-    if (!userBetsSnapshot.empty) {
-      // Get the most recent bet
-      const recentBets = userBetsSnapshot.docs
-        .map(doc => doc.data())
-        .sort((a, b) => {
-          const timeA = a.submissionTime || a.createdAt?.toMillis?.() || 0;
-          const timeB = b.submissionTime || b.createdAt?.toMillis?.() || 0;
-          return timeB - timeA;
-        });
-      
-      const lastBet = recentBets[0];
-      const lastBetTime = lastBet.submissionTime || lastBet.createdAt?.toMillis?.() || 0;
-      const timeSinceLastBet = Date.now() - lastBetTime;
-      const cooldownPeriod = 10000; // 10 seconds in milliseconds
-      
-      if (timeSinceLastBet < cooldownPeriod) {
-        const remainingSeconds = Math.ceil((cooldownPeriod - timeSinceLastBet) / 1000);
-        throw new Error(`Please wait ${remainingSeconds} seconds before placing another bet.`);
-      }
-    }
-
     // First, get user's current balance
     const userQuery = query(collection(database, 'users'), where('userId', '==', userId));
     const querySnapshot = await getDocs(userQuery);
