@@ -51,7 +51,7 @@ const MAX_BET_AMOUNT = 500;
 const MAX_ODDS_MULTIPLIER = 5.0; // Maximum odds multiplier (5x)
 const MAX_PAYOUT_PER_BET = 2500; // Maximum payout per single bet (500 * 5 = 2500)
 const MAX_DAILY_PAYOUT_PER_USER = 10000; // Maximum daily payout per user
-const MAX_MARKET_EXPOSURE = 50000; // Maximum total exposure per market
+const MAX_MARKET_EXPOSURE = 500000; // Maximum total exposure per market (increased from 50,000)
 
 // Team Names for Pit Mafiua Racing League
 export const MOTOGP_RIDERS = [
