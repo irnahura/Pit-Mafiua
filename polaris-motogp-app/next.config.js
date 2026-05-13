@@ -3,9 +3,6 @@ const nextConfig = {
   // Enable React strict mode for better error detection
   reactStrictMode: true,
 
-  // Enable SWC minification (faster than Terser)
-  swcMinify: true,
-
   // Compiler options
   compiler: {
     // Remove console logs in production
@@ -34,47 +31,8 @@ const nextConfig = {
     optimizePackageImports: ['lucide-react', 'firebase'],
   },
 
-  // Headers for caching and security
-  async headers() {
-    return [
-      {
-        source: '/:all*(svg|jpg|png|webp|avif)',
-        headers: [
-          {
-            key: 'Cache-Control',
-            value: 'public, max-age=31536000, immutable',
-          },
-        ],
-      },
-      {
-        source: '/_next/static/:path*',
-        headers: [
-          {
-            key: 'Cache-Control',
-            value: 'public, max-age=31536000, immutable',
-          },
-        ],
-      },
-    ];
-  },
-
-  // Webpack configuration
-  webpack: (config, { dev, isServer }) => {
-    // Production optimizations
-    if (!dev && !isServer) {
-      // Enable tree shaking
-      config.optimization = {
-        ...config.optimization,
-        usedExports: true,
-        sideEffects: false,
-      };
-    }
-
-    return config;
-  },
-
-  // Output configuration
-  output: 'standalone',
+  // Turbopack configuration (Next.js 16+)
+  turbopack: {},
 
   // Power by header
   poweredByHeader: false,

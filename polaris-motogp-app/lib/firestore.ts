@@ -1,7 +1,7 @@
 import { getFirestore, collection, addDoc, serverTimestamp, query, where, getDocs, updateDoc, doc, Firestore, writeBatch } from 'firebase/firestore';
 import { getFirebaseApp } from './firebase';
 import { retryWithBackoff, isRetryableError } from './retry';
-import { logInfo, logError, logWarn } from './logger';
+import { logInfo, logError, logWarn, startTimer } from './logger';
 
 let db: Firestore | null = null;
 
@@ -879,7 +879,7 @@ export const finalizeMarketResults = async (marketId: string, winningSelection: 
     // Filter winning bets using enhanced comparison
     const winningBets = allBetsSnapshot.docs
       .filter(doc => compareSelections(doc.data().selection, winningSelection, betType))
-      .map(doc => ({ id: doc.id, ref: doc.ref, ...doc.data() }))
+      .map(doc => ({ id: doc.id, ref: doc.ref, ...doc.data() as any }))
       .sort((a: any, b: any) => {
         const timeA = a.submissionTime || a.createdAt?.toMillis?.() || 0;
         const timeB = b.submissionTime || b.createdAt?.toMillis?.() || 0;
