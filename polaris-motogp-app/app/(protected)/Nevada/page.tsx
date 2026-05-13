@@ -282,7 +282,7 @@ export default function RaceControlAdmin() {
               Race Control Center
             </h1>
             <p className="text-base text-on-surface-variant max-w-2xl">
-              Manage global betting liquidity, finalize race telemetry, and
+              Manage global prediction liquidity, finalize race telemetry, and
               monitor user engagement metrics in real-time. System status:
               Operational.
             </p>
@@ -679,7 +679,7 @@ export default function RaceControlAdmin() {
           <div className="glass-panel rounded-xl overflow-hidden md:col-span-2">
             <div className="bg-surface-container-highest px-6 py-4 border-b border-outline-variant/30 flex justify-between items-center">
               <h2 className="font-headline text-xl text-on-surface uppercase font-bold">
-                Betting Markets Control
+                Prediction Markets Control
               </h2>
               <span className="font-mono text-[12px] text-primary">
                 {allMarkets.length} TOTAL MARKETS
@@ -747,7 +747,7 @@ export default function RaceControlAdmin() {
                   ))
                 ) : (
                   <div className="col-span-full text-center py-8 text-on-surface-variant">
-                    No betting markets created yet
+                    No prediction markets created yet
                   </div>
                 )}
               </div>

@@ -52,7 +52,7 @@ export default function Navbar() {
           }`}
           href="/betting"
         >
-          Betting
+          Prediction
         </Link>
         <Link
           className={`font-mono text-[10px] uppercase tracking-[0.2em] transition-colors ${

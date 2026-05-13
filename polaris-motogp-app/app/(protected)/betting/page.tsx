@@ -198,7 +198,7 @@ const BettingCard = memo(({
             } font-headline text-base uppercase italic tracking-tighter rounded-lg hover:brightness-110 active:scale-95 transition-all font-bold disabled:opacity-50 disabled:cursor-not-allowed`}
           >
             {isClosed
-              ? 'Betting Closed'
+              ? 'Predictions Closed'
               : loadingBets
               ? 'Loading...'
               : submitting
@@ -451,18 +451,18 @@ export default function BettingArena() {
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
                   <span className="bg-tertiary-container text-on-tertiary font-mono text-[10px] px-2 py-0.5 rounded uppercase font-bold tracking-tighter telemetry-pulse">
-                    {markets.length > 0 ? 'Live Betting' : 'No Active Bets'}
+                    {markets.length > 0 ? 'Live Predictions' : 'No Active Predictions'}
                   </span>
                   <span className="text-on-surface-variant font-mono text-[12px] uppercase">
                     {markets.length} Active Market{markets.length !== 1 ? 's' : ''}
                   </span>
                 </div>
                 <h1 className="font-headline text-5xl md:text-6xl text-on-surface uppercase italic font-black">
-                  Betting Arena
+                  Prediction Arena
                 </h1>
                 <p className="text-on-surface-variant max-w-xl text-lg">
                   Precision engineering meets high-stakes risk. Lock your
-                  tactical predictions before the betting window closes.
+                  tactical predictions before the prediction window closes.
                 </p>
               </div>
               {markets.length > 0 && (
@@ -495,7 +495,7 @@ export default function BettingArena() {
         {marketsLoading && (
           <div className="text-center py-12">
             <div className="inline-block animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-            <p className="mt-4 text-on-surface-variant font-mono text-sm">Loading betting markets...</p>
+            <p className="mt-4 text-on-surface-variant font-mono text-sm">Loading prediction markets...</p>
           </div>
         )}
 
@@ -511,9 +511,9 @@ export default function BettingArena() {
         {!marketsLoading && !marketsError && markets.length === 0 && (
           <div className="glass-card p-12 rounded-xl text-center">
             <Target className="w-16 h-16 text-on-surface-variant mx-auto mb-4 opacity-50" />
-            <h3 className="font-headline text-2xl text-on-surface mb-2">No Active Betting Markets</h3>
+            <h3 className="font-headline text-2xl text-on-surface mb-2">No Active Prediction Markets</h3>
             <p className="text-on-surface-variant">
-              Check back soon! New betting opportunities will be added by race control.
+              Check back soon! New prediction opportunities will be added by race control.
             </p>
           </div>
         )}

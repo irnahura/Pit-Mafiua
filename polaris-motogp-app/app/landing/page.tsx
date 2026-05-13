@@ -132,7 +132,7 @@ export default function LandingPage() {
                     Polaris is the premiere virtual arena for MotoGP
                     enthusiasts. We bridge the gap between spectator and
                     strategist by turning live race data into a competitive
-                    betting ecosystem where knowledge is your only currency.
+                    prediction ecosystem where knowledge is your only currency.
                   </p>
                 </div>
               </div>
@@ -242,7 +242,7 @@ export default function LandingPage() {
                   className="text-on-surface-variant hover:text-primary transition-colors"
                   href="#"
                 >
-                  Betting Rules
+                  Prediction Rules
                 </a>
               </li>
               <li>

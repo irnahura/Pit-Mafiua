@@ -249,7 +249,7 @@ export default function Leaderboard() {
           <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
             <path d="M12 2L4 5v6.09c0 5.05 3.41 9.76 8 10.91 4.59-1.15 8-5.86 8-10.91V5l-8-3z" />
           </svg>
-          <span className="font-mono text-[10px] uppercase mt-1">Betting</span>
+          <span className="font-mono text-[10px] uppercase mt-1">Prediction</span>
         </a>
         <a
           className="flex flex-col items-center justify-center text-primary bg-primary/10 rounded-full px-4 py-1 active:scale-90 duration-150 ease-out"
