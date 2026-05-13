@@ -137,3 +137,42 @@ docs/
 **Last Updated:** May 12, 2026  
 **Version:** 1.0.0  
 **Status:** Production Ready
+
+
+---
+
+## ✨ NEW: Enhanced Betting System (May 13, 2026)
+
+### Feature Documentation
+- **[BETTING_SYSTEM_ENHANCEMENT.md](BETTING_SYSTEM_ENHANCEMENT.md)** - Complete feature guide
+  - User bet locking per market
+  - First-bet-wins logic
+  - Admin market controls
+  - Close and finalize markets
+  - Technical implementation details
+
+### Testing Guide
+- **[TESTING_BETTING_SYSTEM.md](TESTING_BETTING_SYSTEM.md)** - Comprehensive testing
+  - 12 test scenarios
+  - Edge cases
+  - Performance tests
+  - Security tests
+  - Troubleshooting guide
+
+### Key Features
+- ✅ **User Locking**: Users locked after placing bet on a market
+- ✅ **First-Bet-Wins**: Only earliest bet with correct prediction wins
+- ✅ **Admin Controls**: Close and finalize individual markets
+- ✅ **Market Management**: View all markets with status indicators
+- ✅ **Enhanced UI**: Lock icons, active bet display, status colors
+
+### Quick Links
+- **Test User Locking**: [TESTING_BETTING_SYSTEM.md#1-test-user-bet-locking](TESTING_BETTING_SYSTEM.md#1-test-user-bet-locking)
+- **Test Admin Controls**: [TESTING_BETTING_SYSTEM.md#3-test-admin-market-management](TESTING_BETTING_SYSTEM.md#3-test-admin-market-management)
+- **Test First-Bet-Wins**: [TESTING_BETTING_SYSTEM.md#6-test-finalize-results-first-bet-wins](TESTING_BETTING_SYSTEM.md#6-test-finalize-results-first-bet-wins)
+
+---
+
+**Last Updated:** May 13, 2026  
+**Version:** 2.0.0  
+**Status:** ✅ Enhanced & Production Ready
