@@ -1,10 +1,11 @@
 "use client";
 
-import { TrendingUp, TrendingDown, Award, ChevronLeft, ChevronRight } from "lucide-react";
+import { TrendingUp, TrendingDown, Award } from "lucide-react";
 import { useLeaderboard } from "@/hooks/useLeaderboard";
 
 export default function Leaderboard() {
-  const { leaderboard, loading, error } = useLeaderboard(50);
+  const { leaderboard, loading, error } = useLeaderboard(1000); // Fetch up to 1000 users
+  
   return (
     <div className="bg-background text-on-background min-h-screen pb-32 telemetry-grid">
       {/* Top Navigation */}
@@ -18,6 +19,13 @@ export default function Leaderboard() {
           <span className="font-headline text-xl font-black tracking-tighter text-primary">
             POLARIS
           </span>
+          {/* Live Update Indicator */}
+          <div className="flex items-center gap-2 ml-4 px-3 py-1 bg-tertiary/10 rounded-full border border-tertiary/30">
+            <span className="w-2 h-2 bg-tertiary rounded-full animate-pulse"></span>
+            <span className="font-mono text-[10px] text-tertiary uppercase">
+              Live • Updates Every 5s
+            </span>
+          </div>
         </div>
         <div className="flex items-center gap-4">
           <div className="px-3 py-1 bg-surface-container rounded-full border border-outline-variant/30">
@@ -176,7 +184,7 @@ export default function Leaderboard() {
                 No additional players yet
               </div>
             ) : (
-              leaderboard.slice(3, 20).map((entry, index) => (
+              leaderboard.slice(3).map((entry, index) => (
                 <div key={entry.id} className="grid grid-cols-12 gap-4 px-8 py-5 telemetry-row items-center transition-colors">
                   <div className="col-span-1 font-mono text-xl text-on-surface-variant italic font-bold">
                     {String(index + 4).padStart(2, '0')}
@@ -214,18 +222,13 @@ export default function Leaderboard() {
           {/* Footer Pagination */}
           <div className="bg-surface-container-lowest/80 px-8 py-4 flex justify-between items-center border-t border-outline-variant/20">
             <span className="font-mono text-[12px] text-on-surface-variant">
-              Showing 1-{Math.min(leaderboard.length, 20)} of {leaderboard.length} Players
+              Showing All {leaderboard.length} Players • Updates Every 5 Seconds
             </span>
-            <div className="flex gap-2">
-              <button className="w-10 h-10 flex items-center justify-center border border-outline-variant/30 rounded hover:bg-surface-variant/50 transition-colors">
-                <ChevronLeft className="w-5 h-5" />
-              </button>
-              <button className="w-10 h-10 flex items-center justify-center bg-primary/10 border border-primary/30 rounded text-primary font-mono font-bold">
-                1
-              </button>
-              <button className="w-10 h-10 flex items-center justify-center border border-outline-variant/30 rounded hover:bg-surface-variant/50 transition-colors">
-                <ChevronRight className="w-5 h-5" />
-              </button>
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 bg-tertiary rounded-full animate-pulse"></span>
+              <span className="font-mono text-[10px] text-tertiary uppercase">
+                Live
+              </span>
             </div>
           </div>
         </div>

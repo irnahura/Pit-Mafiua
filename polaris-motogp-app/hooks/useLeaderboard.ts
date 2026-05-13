@@ -19,7 +19,7 @@ interface LeaderboardEntry {
   createdAt?: any;
 }
 
-export function useLeaderboard(limit: number = 10) {
+export function useLeaderboard(limit: number = 1000) {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -41,8 +41,8 @@ export function useLeaderboard(limit: number = 10) {
 
     fetchLeaderboard();
 
-    // Refresh leaderboard every 30 seconds
-    const interval = setInterval(fetchLeaderboard, 30000);
+    // Refresh leaderboard every 5 seconds for real-time updates
+    const interval = setInterval(fetchLeaderboard, 5000);
 
     return () => clearInterval(interval);
   }, [limit]);
