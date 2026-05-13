@@ -53,6 +53,7 @@ export default function RaceControlAdmin() {
   const [icon, setIcon] = useState("trophy");
   const [color, setColor] = useState("primary");
   const [odds, setOdds] = useState("2.5");
+  const [betType, setBetType] = useState("race-winner");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -109,6 +110,9 @@ export default function RaceControlAdmin() {
         icon,
         color,
         odds: parseFloat(odds),
+        betType,
+        selectionType: betType === 'podium' ? 'multiple' : betType === 'top5' ? 'multiple' : 'single',
+        maxSelections: betType === 'podium' ? 3 : betType === 'top5' ? 5 : 1,
       });
 
       alert("Betting market created successfully!");
@@ -119,6 +123,7 @@ export default function RaceControlAdmin() {
       setIcon("trophy");
       setColor("primary");
       setOdds("2.5");
+      setBetType("race-winner");
       loadAdminData();
     } catch (error: any) {
       const errorMessage = error?.message || 'Unknown error';
@@ -394,6 +399,29 @@ export default function RaceControlAdmin() {
                       required
                     />
                   </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="font-mono text-[12px] text-on-surface-variant uppercase">
+                    Bet Type
+                  </label>
+                  <select
+                    value={betType}
+                    onChange={(e) => setBetType(e.target.value)}
+                    className="w-full bg-surface-container-lowest border border-outline-variant/50 rounded-lg px-4 py-3 font-mono text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
+                  >
+                    <option value="race-winner">Race Winner</option>
+                    <option value="podium">Podium Finish (Top 3)</option>
+                    <option value="top5">Top 5 Finish</option>
+                    <option value="fastest-lap">Fastest Lap</option>
+                    <option value="pole-position">Pole Position</option>
+                  </select>
+                  <p className="text-[10px] text-on-surface-variant font-mono">
+                    {betType === 'podium' && '✓ Users predict top 3 finishers'}
+                    {betType === 'top5' && '✓ Users predict top 5 finishers'}
+                    {betType === 'fastest-lap' && '✓ Users predict who sets fastest lap'}
+                    {betType === 'pole-position' && '✓ Users predict pole position winner'}
+                    {betType === 'race-winner' && '✓ Users predict race winner'}
+                  </p>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">

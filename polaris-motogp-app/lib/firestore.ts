@@ -41,6 +41,11 @@ export const logUserCreation = async (userId: string, email: string) => {
 const MIN_BET_AMOUNT = 50;
 const MAX_BET_AMOUNT = 500;
 
+// Risk control constants
+const MAX_PAYOUT_PER_BET = 5000; // Maximum payout per single bet
+const MAX_DAILY_PAYOUT_PER_USER = 10000; // Maximum daily payout per user
+const MAX_MARKET_EXPOSURE = 50000; // Maximum total exposure per market
+
 // Bet logging with PitCoin deduction and betting limits validation
 export const logBet = async (userId: string, betData: {
   marketType: string;
@@ -50,6 +55,7 @@ export const logBet = async (userId: string, betData: {
   potentialReturn: number;
   raceEvent: string;
   marketId?: string; // Add marketId to track which market the bet is for
+  betType?: string; // NEW: Type of bet (race-winner, podium, top5, fastest-lap)
 }) => {
   try {
     const database = getDb();
@@ -61,6 +67,32 @@ export const logBet = async (userId: string, betData: {
     }
     if (betData.stakeAmount > MAX_BET_AMOUNT) {
       throw new Error(`Maximum bet amount is ${MAX_BET_AMOUNT} PitCoins`);
+    }
+
+    // RULE 2: Validate max payout per bet
+    if (betData.potentialReturn > MAX_PAYOUT_PER_BET) {
+      throw new Error(`Maximum payout per bet is ${MAX_PAYOUT_PER_BET} PC. Reduce your stake or choose lower odds.`);
+    }
+
+    // RULE 3: Check daily payout limit
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayTimestamp = today.getTime();
+
+    const dailyBetsQuery = query(
+      collection(database, 'bets'),
+      where('userId', '==', userId),
+      where('submissionTime', '>=', todayTimestamp),
+      where('status', '==', 'won')
+    );
+    const dailyBetsSnapshot = await getDocs(dailyBetsQuery);
+    
+    const dailyPayouts = dailyBetsSnapshot.docs.reduce((sum, doc) => {
+      return sum + (doc.data().potentialReturn || 0);
+    }, 0);
+
+    if (dailyPayouts + betData.potentialReturn > MAX_DAILY_PAYOUT_PER_USER) {
+      throw new Error(`Daily payout limit reached (${MAX_DAILY_PAYOUT_PER_USER} PC). Try again tomorrow.`);
     }
 
     // Check if user already has an active bet on this market
@@ -99,6 +131,7 @@ export const logBet = async (userId: string, betData: {
       userId,
       marketId: betData.marketId || null,
       marketType: betData.marketType,
+      betType: betData.betType || 'race-winner', // Default to race-winner
       selection: betData.selection,
       stakeAmount: betData.stakeAmount,
       odds: betData.odds,
@@ -432,6 +465,9 @@ export const createBettingMarket = async (marketData: {
   icon?: string;
   color?: string;
   odds?: number;
+  betType?: string; // NEW: race-winner, podium, top5, fastest-lap
+  selectionType?: string; // NEW: single, multiple, numeric
+  maxSelections?: number; // NEW: For podium (3), top5 (5)
 }) => {
   try {
     const database = getDb();
@@ -439,6 +475,9 @@ export const createBettingMarket = async (marketData: {
 
     const marketRef = await addDoc(collection(database, 'betting_markets'), {
       ...marketData,
+      betType: marketData.betType || 'race-winner',
+      selectionType: marketData.selectionType || 'single',
+      maxSelections: marketData.maxSelections || 1,
       status: 'open',
       createdAt: serverTimestamp(),
       totalStake: 0,

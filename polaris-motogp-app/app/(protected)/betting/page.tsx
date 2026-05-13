@@ -155,6 +155,7 @@ export default function BettingArena() {
       await logBet(user.uid, {
         marketId: market.id, // Pass marketId for locking
         marketType: market.betName,
+        betType: market.betType || 'race-winner',
         selection: selection,
         stakeAmount: amount,
         odds: odds,
@@ -369,9 +370,29 @@ export default function BettingArena() {
                     <h3 className="font-headline text-2xl text-on-surface uppercase mb-2 font-bold">
                       {market.betName}
                     </h3>
-                    <p className="text-on-surface-variant text-base mb-8">
+                    {market.betType && market.betType !== 'race-winner' && (
+                      <div className="mb-2">
+                        <span className="text-[10px] font-mono uppercase px-2 py-1 rounded bg-tertiary/20 text-tertiary">
+                          {market.betType === 'podium' && '🏆 Top 3'}
+                          {market.betType === 'top5' && '🏆 Top 5'}
+                          {market.betType === 'fastest-lap' && '⚡ Fastest Lap'}
+                          {market.betType === 'pole-position' && '🎯 Pole Position'}
+                        </span>
+                      </div>
+                    )}
+                    <p className="text-on-surface-variant text-base mb-4">
                       {market.summary}
                     </p>
+                    {market.betType === 'podium' && (
+                      <p className="text-[10px] text-tertiary font-mono mb-4">
+                        💡 Predict the top 3 finishers in order
+                      </p>
+                    )}
+                    {market.betType === 'top5' && (
+                      <p className="text-[10px] text-tertiary font-mono mb-4">
+                        💡 Predict the top 5 finishers in order
+                      </p>
+                    )}
                   </div>
 
                   {/* Show locked bet info */}
@@ -410,14 +431,22 @@ export default function BettingArena() {
                       <div className="relative">
                         <input
                           className="w-full bg-surface-container-lowest border border-outline-variant/30 rounded-lg py-3 px-4 text-on-surface focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-all"
-                          placeholder="Enter your prediction..."
+                          placeholder={
+                            market.betType === 'podium' ? 'e.g., Jorge Martin, Pecco Bagnaia, Marc Marquez' :
+                            market.betType === 'top5' ? 'e.g., Martin, Bagnaia, Marquez, Binder, Bastianini' :
+                            market.betType === 'fastest-lap' ? 'e.g., Jorge Martin' :
+                            market.betType === 'pole-position' ? 'e.g., Pecco Bagnaia' :
+                            'Enter your prediction...'
+                          }
                           type="text"
                           value={betSelections[market.id] || ''}
                           onChange={(e) => handleBetSelectionChange(market.id, e.target.value)}
                           disabled={isClosed || submitting[market.id] || loadingBets}
                         />
                         <label className="absolute -top-2 left-3 bg-background px-2 text-[10px] font-mono text-outline uppercase">
-                          Your Prediction
+                          {market.betType === 'podium' ? 'Top 3 Riders (comma separated)' :
+                           market.betType === 'top5' ? 'Top 5 Riders (comma separated)' :
+                           'Your Prediction'}
                         </label>
                       </div>
 
