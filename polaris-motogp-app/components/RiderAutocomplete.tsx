@@ -15,7 +15,7 @@ interface RiderAutocompleteProps {
 export default function RiderAutocomplete({
   value,
   onChange,
-  placeholder = "Enter rider name...",
+  placeholder = "Enter team name...",
   disabled = false,
   multiple = false,
   maxSelections = 1,
@@ -46,8 +46,8 @@ export default function RiderAutocomplete({
     onChange(inputValue);
 
     if (inputValue.trim().length > 0) {
-      const filtered = MOTOGP_RIDERS.filter(rider =>
-        rider.toLowerCase().includes(inputValue.toLowerCase())
+      const filtered = MOTOGP_RIDERS.filter(team =>
+        team.toLowerCase().includes(inputValue.toLowerCase())
       );
       setFilteredRiders(filtered);
       setShowSuggestions(true);
@@ -56,26 +56,26 @@ export default function RiderAutocomplete({
     }
   };
 
-  const handleSelectRider = (rider: string) => {
+  const handleSelectRider = (team: string) => {
     if (multiple) {
       const currentSelections = value.split(',').map(s => s.trim()).filter(s => s.length > 0);
       
       if (currentSelections.length < maxSelections) {
         const newValue = currentSelections.length > 0 
-          ? `${value}, ${rider}`
-          : rider;
+          ? `${value}, ${team}`
+          : team;
         onChange(newValue);
       }
     } else {
-      onChange(rider);
+      onChange(team);
     }
     setShowSuggestions(false);
   };
 
   const handleFocus = () => {
     if (value.trim().length > 0) {
-      const filtered = MOTOGP_RIDERS.filter(rider =>
-        rider.toLowerCase().includes(value.toLowerCase())
+      const filtered = MOTOGP_RIDERS.filter(team =>
+        team.toLowerCase().includes(value.toLowerCase())
       );
       setFilteredRiders(filtered);
       setShowSuggestions(true);
@@ -104,14 +104,14 @@ export default function RiderAutocomplete({
           ref={suggestionsRef}
           className="absolute z-50 w-full mt-1 bg-surface-container-high border border-outline-variant/30 rounded-lg shadow-lg max-h-60 overflow-y-auto"
         >
-          {filteredRiders.map((rider, index) => (
+          {filteredRiders.map((team, index) => (
             <button
               key={index}
               type="button"
-              onClick={() => handleSelectRider(rider)}
+              onClick={() => handleSelectRider(team)}
               className="w-full text-left px-4 py-2 hover:bg-primary/10 text-on-surface font-mono text-sm transition-colors first:rounded-t-lg last:rounded-b-lg"
             >
-              {rider}
+              {team}
             </button>
           ))}
         </div>

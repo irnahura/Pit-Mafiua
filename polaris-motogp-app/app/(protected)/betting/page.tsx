@@ -145,19 +145,19 @@ const BettingCard = memo(({
               value={betSelection || ''}
               onChange={onSelectionChange}
               placeholder={
-                market.betType === 'podium' ? 'Select top 3 riders...' :
-                market.betType === 'top5' ? 'Select top 5 riders...' :
-                market.betType === 'fastest-lap' ? 'Select rider...' :
-                market.betType === 'pole-position' ? 'Select rider...' :
-                'Select rider...'
+                market.betType === 'podium' ? 'Select top 3 teams...' :
+                market.betType === 'top5' ? 'Select top 5 teams...' :
+                market.betType === 'fastest-lap' ? 'Select team...' :
+                market.betType === 'pole-position' ? 'Select team...' :
+                'Select team...'
               }
               disabled={isClosed || submitting || loadingBets}
               multiple={market.betType === 'podium' || market.betType === 'top5'}
               maxSelections={market.betType === 'podium' ? 3 : market.betType === 'top5' ? 5 : 1}
             />
             <label className="absolute -top-2 left-3 bg-background px-2 text-[10px] font-mono text-outline uppercase z-10">
-              {market.betType === 'podium' ? 'Top 3 Riders' :
-               market.betType === 'top5' ? 'Top 5 Riders' :
+              {market.betType === 'podium' ? 'Top 3 Teams' :
+               market.betType === 'top5' ? 'Top 5 Teams' :
                'Your Prediction'}
             </label>
           </div>

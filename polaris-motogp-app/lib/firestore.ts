@@ -53,28 +53,14 @@ const MAX_PAYOUT_PER_BET = 2500; // Maximum payout per single bet (500 * 5 = 250
 const MAX_DAILY_PAYOUT_PER_USER = 10000; // Maximum daily payout per user
 const MAX_MARKET_EXPOSURE = 50000; // Maximum total exposure per market
 
-// MotoGP 2026 Rider Roster
+// Team Names for Pit Mafiua Racing League
 export const MOTOGP_RIDERS = [
-  'Jorge Martin',
-  'Pecco Bagnaia',
-  'Marc Marquez',
-  'Brad Binder',
-  'Enea Bastianini',
-  'Maverick Vinales',
-  'Fabio Quartararo',
-  'Jack Miller',
-  'Alex Marquez',
-  'Franco Morbidelli',
-  'Miguel Oliveira',
-  'Raul Fernandez',
-  'Johann Zarco',
-  'Takaaki Nakagami',
-  'Augusto Fernandez',
-  'Joan Mir',
-  'Alex Rins',
-  'Luca Marini',
-  'Marco Bezzecchi',
-  'Fabio Di Giannantonio',
+  'APEX 5',
+  'FORCE-BLR',
+  'MAREVICKS',
+  'ORION',
+  'SKIBDI RACER',
+  'THEONEPEICEISREAL',
 ];
 
 // Bet logging with PitCoin deduction and betting limits validation
@@ -819,9 +805,9 @@ export const closeBettingMarket = async (marketId: string) => {
   }
 };
 
-// Helper function to normalize rider names
+// Helper function to normalize team names
 const normalizeRiderName = (name: string): string => {
-  return name.trim().toLowerCase().replace(/[^a-z\s]/g, '');
+  return name.trim().toLowerCase().replace(/[^a-z0-9\s]/g, '');
 };
 
 // Helper function to parse comma-separated selections
