@@ -805,6 +805,90 @@ export const closeBettingMarket = async (marketId: string) => {
   }
 };
 
+// Reopen a specific betting market (admin only)
+export const reopenBettingMarket = async (marketId: string) => {
+  try {
+    return await retryWithBackoff(async () => {
+      const database = getDb();
+      if (!database) throw new Error('Firestore not initialized');
+
+      const marketRef = doc(database, 'betting_markets', marketId);
+      await updateDoc(marketRef, {
+        status: 'open',
+        reopenedAt: serverTimestamp(),
+      });
+
+      logInfo('Betting market reopened', { marketId });
+      return { success: true };
+    });
+  } catch (error) {
+    logError('Error reopening betting market', { marketId, error });
+    throw error;
+  }
+};
+
+// Delete a specific betting market (admin only)
+export const deleteBettingMarket = async (marketId: string) => {
+  try {
+    return await retryWithBackoff(async () => {
+      const database = getDb();
+      if (!database) throw new Error('Firestore not initialized');
+
+      // Get all bets for this market
+      const betsQuery = query(
+        collection(database, 'bets'),
+        where('marketId', '==', marketId),
+        where('status', '==', 'pending')
+      );
+      const betsSnapshot = await getDocs(betsQuery);
+
+      // Refund all pending bets
+      const refundPromises = betsSnapshot.docs.map(async (betDoc) => {
+        const bet = betDoc.data();
+        const userId = bet.userId;
+        const stakeAmount = bet.stakeAmount;
+
+        // Get user and refund stake
+        const userQuery = query(collection(database, 'users'), where('userId', '==', userId));
+        const userSnapshot = await getDocs(userQuery);
+
+        if (!userSnapshot.empty) {
+          const userDoc = userSnapshot.docs[0];
+          const currentBalance = userDoc.data().pitcoinBalance || 0;
+
+          await updateDoc(userDoc.ref, {
+            pitcoinBalance: currentBalance + stakeAmount,
+          });
+        }
+
+        // Mark bet as cancelled
+        await updateDoc(betDoc.ref, {
+          status: 'cancelled',
+          updatedAt: serverTimestamp(),
+        });
+      });
+
+      await Promise.all(refundPromises);
+
+      // Delete the market
+      const marketRef = doc(database, 'betting_markets', marketId);
+      await updateDoc(marketRef, {
+        status: 'deleted',
+        deletedAt: serverTimestamp(),
+      });
+
+      logInfo('Betting market deleted and bets refunded', { 
+        marketId, 
+        refundedBets: betsSnapshot.docs.length 
+      });
+      return { success: true, refundedBets: betsSnapshot.docs.length };
+    });
+  } catch (error) {
+    logError('Error deleting betting market', { marketId, error });
+    throw error;
+  }
+};
+
 // Helper function to normalize team names
 const normalizeRiderName = (name: string): string => {
   return name.trim().toLowerCase().replace(/[^a-z0-9\s]/g, '');

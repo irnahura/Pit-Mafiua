@@ -27,6 +27,8 @@ import {
   toggleUserStatus,
   getAllBettingMarkets,
   closeBettingMarket,
+  reopenBettingMarket,
+  deleteBettingMarket,
   finalizeMarketResults,
 } from "@/lib/firestore";
 
@@ -178,7 +180,7 @@ export default function RaceControlAdmin() {
   };
 
   const handleCloseMarket = async (marketId: string) => {
-    if (!confirm("Are you sure you want to close this betting market?")) return;
+    if (!confirm("Are you sure you want to close this prediction market?")) return;
     
     try {
       await closeBettingMarket(marketId);
@@ -186,6 +188,32 @@ export default function RaceControlAdmin() {
       loadAdminData();
     } catch (error) {
       alert("Error closing market");
+      console.error(error);
+    }
+  };
+
+  const handleReopenMarket = async (marketId: string) => {
+    if (!confirm("Are you sure you want to reopen this prediction market?")) return;
+    
+    try {
+      await reopenBettingMarket(marketId);
+      alert("Market reopened successfully!");
+      loadAdminData();
+    } catch (error) {
+      alert("Error reopening market");
+      console.error(error);
+    }
+  };
+
+  const handleDeleteMarket = async (marketId: string) => {
+    if (!confirm("⚠️ WARNING: This will DELETE the market and REFUND all pending bets!\n\nAre you absolutely sure?")) return;
+    
+    try {
+      const result = await deleteBettingMarket(marketId);
+      alert(`Market deleted successfully!\n\n${result.refundedBets} bet(s) refunded to users.`);
+      loadAdminData();
+    } catch (error) {
+      alert("Error deleting market");
       console.error(error);
     }
   };
@@ -718,29 +746,59 @@ export default function RaceControlAdmin() {
                       </p>
                       <div className="flex gap-2">
                         {market.status === 'open' && (
-                          <button
-                            onClick={() => handleCloseMarket(market.id)}
-                            className="flex-1 bg-error/20 text-error border border-error/30 font-mono text-[10px] uppercase py-2 rounded hover:bg-error/30 transition-colors"
-                          >
-                            Close
-                          </button>
+                          <>
+                            <button
+                              onClick={() => handleCloseMarket(market.id)}
+                              className="flex-1 bg-error/20 text-error border border-error/30 font-mono text-[10px] uppercase py-2 rounded hover:bg-error/30 transition-colors"
+                            >
+                              Close
+                            </button>
+                            <button
+                              onClick={() => handleDeleteMarket(market.id)}
+                              className="flex-1 bg-error text-on-error font-mono text-[10px] uppercase py-2 rounded hover:brightness-110 transition-all"
+                            >
+                              Delete
+                            </button>
+                          </>
                         )}
                         {market.status === 'closed' && (
-                          <button
-                            onClick={() => setSelectedMarket(market.id)}
-                            className={`flex-1 ${
-                              selectedMarket === market.id
-                                ? 'bg-tertiary text-on-tertiary'
-                                : 'bg-tertiary/20 text-tertiary border border-tertiary/30'
-                            } font-mono text-[10px] uppercase py-2 rounded hover:bg-tertiary/30 transition-colors`}
-                          >
-                            {selectedMarket === market.id ? 'Selected' : 'Select'}
-                          </button>
+                          <>
+                            <button
+                              onClick={() => setSelectedMarket(market.id)}
+                              className={`flex-1 ${
+                                selectedMarket === market.id
+                                  ? 'bg-tertiary text-on-tertiary'
+                                  : 'bg-tertiary/20 text-tertiary border border-tertiary/30'
+                              } font-mono text-[10px] uppercase py-2 rounded hover:bg-tertiary/30 transition-colors`}
+                            >
+                              {selectedMarket === market.id ? 'Selected' : 'Select'}
+                            </button>
+                            <button
+                              onClick={() => handleReopenMarket(market.id)}
+                              className="flex-1 bg-primary/20 text-primary border border-primary/30 font-mono text-[10px] uppercase py-2 rounded hover:bg-primary/30 transition-colors"
+                            >
+                              Reopen
+                            </button>
+                            <button
+                              onClick={() => handleDeleteMarket(market.id)}
+                              className="flex-1 bg-error text-on-error font-mono text-[10px] uppercase py-2 rounded hover:brightness-110 transition-all"
+                            >
+                              Delete
+                            </button>
+                          </>
                         )}
                         {market.status === 'finalized' && (
-                          <div className="flex-1 bg-secondary/20 text-secondary border border-secondary/30 font-mono text-[10px] uppercase py-2 rounded text-center">
-                            Finalized
-                          </div>
+                          <>
+                            <div className="flex-1 bg-secondary/20 text-secondary border border-secondary/30 font-mono text-[10px] uppercase py-2 rounded text-center">
+                              Finalized
+                            </div>
+                            <button
+                              onClick={() => handleDeleteMarket(market.id)}
+                              className="flex-1 bg-error/20 text-error border border-error/30 font-mono text-[10px] uppercase py-2 rounded hover:bg-error/30 transition-colors"
+                            >
+                              Delete
+                            </button>
+                          </>
                         )}
                       </div>
                     </div>
