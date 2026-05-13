@@ -101,6 +101,14 @@ export default function RaceControlAdmin() {
         return;
       }
 
+      // Validate odds (max 5x)
+      const oddsValue = parseFloat(odds);
+      if (oddsValue > 5.0) {
+        alert('Maximum odds is 5.0x');
+        setIsSubmitting(false);
+        return;
+      }
+
       await createBettingMarket({
         betName,
         summary,
@@ -109,7 +117,7 @@ export default function RaceControlAdmin() {
         raceEvent: "MotoGP 2026",
         icon,
         color,
-        odds: parseFloat(odds),
+        odds: oddsValue,
         betType,
         selectionType: betType === 'podium' ? 'multiple' : betType === 'top5' ? 'multiple' : 'single',
         maxSelections: betType === 'podium' ? 3 : betType === 'top5' ? 5 : 1,
@@ -498,9 +506,12 @@ export default function RaceControlAdmin() {
                       type="number"
                       step="0.1"
                       min="1"
-                      max="10"
+                      max="5"
                       required
                     />
+                    <p className="text-[10px] text-on-surface-variant font-mono">
+                      Max 5.0x odds allowed
+                    </p>
                   </div>
                 </div>
                 <button

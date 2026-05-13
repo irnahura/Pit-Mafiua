@@ -42,9 +42,34 @@ const MIN_BET_AMOUNT = 50;
 const MAX_BET_AMOUNT = 500;
 
 // Risk control constants
-const MAX_PAYOUT_PER_BET = 5000; // Maximum payout per single bet
+const MAX_ODDS_MULTIPLIER = 5.0; // Maximum odds multiplier (5x)
+const MAX_PAYOUT_PER_BET = 2500; // Maximum payout per single bet (500 * 5 = 2500)
 const MAX_DAILY_PAYOUT_PER_USER = 10000; // Maximum daily payout per user
 const MAX_MARKET_EXPOSURE = 50000; // Maximum total exposure per market
+
+// MotoGP 2026 Rider Roster
+export const MOTOGP_RIDERS = [
+  'Jorge Martin',
+  'Pecco Bagnaia',
+  'Marc Marquez',
+  'Brad Binder',
+  'Enea Bastianini',
+  'Maverick Vinales',
+  'Fabio Quartararo',
+  'Jack Miller',
+  'Alex Marquez',
+  'Franco Morbidelli',
+  'Miguel Oliveira',
+  'Raul Fernandez',
+  'Johann Zarco',
+  'Takaaki Nakagami',
+  'Augusto Fernandez',
+  'Joan Mir',
+  'Alex Rins',
+  'Luca Marini',
+  'Marco Bezzecchi',
+  'Fabio Di Giannantonio',
+];
 
 // Bet logging with PitCoin deduction and betting limits validation
 export const logBet = async (userId: string, betData: {
@@ -54,8 +79,8 @@ export const logBet = async (userId: string, betData: {
   odds: number;
   potentialReturn: number;
   raceEvent: string;
-  marketId?: string; // Add marketId to track which market the bet is for
-  betType?: string; // NEW: Type of bet (race-winner, podium, top5, fastest-lap)
+  marketId?: string;
+  betType?: string;
 }) => {
   try {
     const database = getDb();
@@ -69,12 +94,35 @@ export const logBet = async (userId: string, betData: {
       throw new Error(`Maximum bet amount is ${MAX_BET_AMOUNT} PitCoins`);
     }
 
-    // RULE 2: Validate max payout per bet
-    if (betData.potentialReturn > MAX_PAYOUT_PER_BET) {
-      throw new Error(`Maximum payout per bet is ${MAX_PAYOUT_PER_BET} PC. Reduce your stake or choose lower odds.`);
+    // RULE 2: Validate max odds (5x maximum)
+    if (betData.odds > MAX_ODDS_MULTIPLIER) {
+      throw new Error(`Maximum odds multiplier is ${MAX_ODDS_MULTIPLIER}x`);
     }
 
-    // RULE 3: Check daily payout limit
+    // RULE 3: Validate max payout per bet
+    if (betData.potentialReturn > MAX_PAYOUT_PER_BET) {
+      throw new Error(`Maximum payout per bet is ${MAX_PAYOUT_PER_BET} PC (max ${MAX_ODDS_MULTIPLIER}x odds)`);
+    }
+
+    // RULE 4: Check market exposure
+    if (betData.marketId) {
+      const marketBetsQuery = query(
+        collection(database, 'bets'),
+        where('marketId', '==', betData.marketId),
+        where('status', '==', 'pending')
+      );
+      const marketBetsSnapshot = await getDocs(marketBetsQuery);
+      
+      const currentExposure = marketBetsSnapshot.docs.reduce((sum, doc) => {
+        return sum + (doc.data().potentialReturn || 0);
+      }, 0);
+
+      if (currentExposure + betData.potentialReturn > MAX_MARKET_EXPOSURE) {
+        throw new Error(`Market exposure limit reached. This market is temporarily closed.`);
+      }
+    }
+
+    // RULE 5: Check daily payout limit
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const todayTimestamp = today.getTime();
@@ -131,16 +179,16 @@ export const logBet = async (userId: string, betData: {
       userId,
       marketId: betData.marketId || null,
       marketType: betData.marketType,
-      betType: betData.betType || 'race-winner', // Default to race-winner
+      betType: betData.betType || 'race-winner',
       selection: betData.selection,
       stakeAmount: betData.stakeAmount,
       odds: betData.odds,
       potentialReturn: betData.potentialReturn,
       raceEvent: betData.raceEvent,
-      status: 'pending', // pending, won, lost
-      createdAt: serverTimestamp(), // Used for tie-breaker rule #3
+      status: 'pending',
+      createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-      submissionTime: Date.now(), // Explicit timestamp for tie-breaker
+      submissionTime: Date.now(),
     });
 
     // Deduct PitCoin from user balance
@@ -750,32 +798,75 @@ export const closeBettingMarket = async (marketId: string) => {
   }
 };
 
+// Helper function to normalize rider names
+const normalizeRiderName = (name: string): string => {
+  return name.trim().toLowerCase().replace(/[^a-z\s]/g, '');
+};
+
+// Helper function to parse comma-separated selections
+const parseSelection = (selection: string): string[] => {
+  return selection.split(',').map(s => normalizeRiderName(s)).filter(s => s.length > 0);
+};
+
+// Helper function to compare selections
+const compareSelections = (userSelection: string, winningSelection: string, betType: string): boolean => {
+  if (betType === 'podium' || betType === 'top5') {
+    const userList = parseSelection(userSelection);
+    const winningList = parseSelection(winningSelection);
+    
+    // Must have correct number of selections
+    const expectedCount = betType === 'podium' ? 3 : 5;
+    if (userList.length !== expectedCount || winningList.length !== expectedCount) {
+      return false;
+    }
+    
+    // All must match in order
+    for (let i = 0; i < expectedCount; i++) {
+      if (userList[i] !== winningList[i]) {
+        return false;
+      }
+    }
+    return true;
+  } else {
+    // Single selection - normalize and compare
+    return normalizeRiderName(userSelection) === normalizeRiderName(winningSelection);
+  }
+};
+
 // Finalize specific market results with first-bet-wins logic (admin only)
 export const finalizeMarketResults = async (marketId: string, winningSelection: string) => {
   try {
     const database = getDb();
     if (!database) throw new Error('Firestore not initialized');
 
-    // Find all bets for this market with the winning selection
-    const betsQuery = query(
+    // Get market to check bet type
+    const marketRef = doc(database, 'betting_markets', marketId);
+    const marketDoc = await getDocs(query(collection(database, 'betting_markets'), where('__name__', '==', marketId)));
+    const market = marketDoc.docs[0]?.data();
+    const betType = market?.betType || 'race-winner';
+
+    // Find all bets for this market
+    const allBetsQuery = query(
       collection(database, 'bets'),
       where('marketId', '==', marketId),
-      where('selection', '==', winningSelection),
       where('status', '==', 'pending')
     );
-    const querySnapshot = await getDocs(betsQuery);
+    const allBetsSnapshot = await getDocs(allBetsQuery);
 
-    if (querySnapshot.empty) {
+    // Filter winning bets using enhanced comparison
+    const winningBets = allBetsSnapshot.docs
+      .filter(doc => compareSelections(doc.data().selection, winningSelection, betType))
+      .map(doc => ({ id: doc.id, ref: doc.ref, ...doc.data() }))
+      .sort((a: any, b: any) => {
+        const timeA = a.submissionTime || a.createdAt?.toMillis?.() || 0;
+        const timeB = b.submissionTime || b.createdAt?.toMillis?.() || 0;
+        return timeA - timeB;
+      });
+
+    if (winningBets.length === 0) {
       console.log('No winning bets found for this selection');
       
       // Mark all bets as lost
-      const allBetsQuery = query(
-        collection(database, 'bets'),
-        where('marketId', '==', marketId),
-        where('status', '==', 'pending')
-      );
-      const allBetsSnapshot = await getDocs(allBetsQuery);
-
       const losingBetsPromises = allBetsSnapshot.docs.map(async (betDoc) => {
         await updateDoc(betDoc.ref, {
           status: 'lost',
@@ -786,7 +877,6 @@ export const finalizeMarketResults = async (marketId: string, winningSelection: 
       await Promise.all(losingBetsPromises);
 
       // Update market status
-      const marketRef = doc(database, 'betting_markets', marketId);
       await updateDoc(marketRef, {
         status: 'finalized',
         winningSelection,
@@ -796,16 +886,7 @@ export const finalizeMarketResults = async (marketId: string, winningSelection: 
       return { success: true, winnersCount: 0 };
     }
 
-    // FIRST-BET-WINS LOGIC: Sort by submission time and get the earliest bet
-    const winningBets = querySnapshot.docs
-      .map(doc => ({ id: doc.id, ref: doc.ref, ...doc.data() }))
-      .sort((a: any, b: any) => {
-        const timeA = a.submissionTime || a.createdAt?.toMillis?.() || 0;
-        const timeB = b.submissionTime || b.createdAt?.toMillis?.() || 0;
-        return timeA - timeB;
-      });
-
-    // Only the FIRST bet wins
+    // FIRST-BET-WINS LOGIC: Only the FIRST bet wins
     const firstWinningBet = winningBets[0];
     const userId = firstWinningBet.userId;
     const winnings = firstWinningBet.potentialReturn;
@@ -831,33 +912,19 @@ export const finalizeMarketResults = async (marketId: string, winningSelection: 
       });
     }
 
-    // Mark all other bets (including other correct predictions) as lost
-    const losingBetsPromises = winningBets.slice(1).map(async (bet: any) => {
-      await updateDoc(bet.ref, {
-        status: 'lost',
-        updatedAt: serverTimestamp(),
+    // Mark all other bets as lost
+    const losingBetsPromises = allBetsSnapshot.docs
+      .filter(doc => doc.id !== firstWinningBet.id)
+      .map(async (betDoc) => {
+        await updateDoc(betDoc.ref, {
+          status: 'lost',
+          updatedAt: serverTimestamp(),
+        });
       });
-    });
 
-    // Also mark bets with wrong predictions as lost
-    const wrongBetsQuery = query(
-      collection(database, 'bets'),
-      where('marketId', '==', marketId),
-      where('status', '==', 'pending')
-    );
-    const wrongBetsSnapshot = await getDocs(wrongBetsQuery);
-
-    const wrongBetsPromises = wrongBetsSnapshot.docs.map(async (betDoc) => {
-      await updateDoc(betDoc.ref, {
-        status: 'lost',
-        updatedAt: serverTimestamp(),
-      });
-    });
-
-    await Promise.all([...losingBetsPromises, ...wrongBetsPromises]);
+    await Promise.all(losingBetsPromises);
 
     // Update market status
-    const marketRef = doc(database, 'betting_markets', marketId);
     await updateDoc(marketRef, {
       status: 'finalized',
       winningSelection,
@@ -1007,3 +1074,130 @@ export const updateConstructorStanding = async (constructorData: {
 };
 
 export { getDb };
+
+// ============================================
+// PARLAY / MULTI-BET SYSTEM
+// ============================================
+
+export interface ParlaySelection {
+  marketId: string;
+  marketName: string;
+  selection: string;
+  odds: number;
+}
+
+export interface Parlay {
+  id?: string;
+  userId: string;
+  selections: ParlaySelection[];
+  combinedOdds: number;
+  stakeAmount: number;
+  potentialReturn: number;
+  status: 'pending' | 'won' | 'lost';
+  raceEvent: string;
+  submissionTime: number;
+  createdAt?: any;
+  updatedAt?: any;
+}
+
+// Create a parlay bet
+export const createParlay = async (userId: string, parlayData: {
+  selections: ParlaySelection[];
+  stakeAmount: number;
+  raceEvent: string;
+}) => {
+  try {
+    const database = getDb();
+    if (!database) throw new Error('Firestore not initialized');
+
+    // Validate minimum 2 selections
+    if (parlayData.selections.length < 2) {
+      throw new Error('Parlay must have at least 2 selections');
+    }
+
+    // Validate maximum 5 selections
+    if (parlayData.selections.length > 5) {
+      throw new Error('Parlay can have maximum 5 selections');
+    }
+
+    // Calculate combined odds (multiply all odds, but cap at 5x)
+    let combinedOdds = parlayData.selections.reduce((acc, sel) => acc * sel.odds, 1);
+    combinedOdds = Math.min(combinedOdds, MAX_ODDS_MULTIPLIER); // Cap at 5x
+
+    const potentialReturn = parlayData.stakeAmount * combinedOdds;
+
+    // Validate betting limits
+    if (parlayData.stakeAmount < MIN_BET_AMOUNT) {
+      throw new Error(`Minimum bet amount is ${MIN_BET_AMOUNT} PitCoins`);
+    }
+    if (parlayData.stakeAmount > MAX_BET_AMOUNT) {
+      throw new Error(`Maximum bet amount is ${MAX_BET_AMOUNT} PitCoins`);
+    }
+    if (potentialReturn > MAX_PAYOUT_PER_BET) {
+      throw new Error(`Maximum payout is ${MAX_PAYOUT_PER_BET} PC (max ${MAX_ODDS_MULTIPLIER}x odds)`);
+    }
+
+    // Check user balance
+    const userQuery = query(collection(database, 'users'), where('userId', '==', userId));
+    const querySnapshot = await getDocs(userQuery);
+
+    if (querySnapshot.empty) {
+      throw new Error('User not found');
+    }
+
+    const userDoc = querySnapshot.docs[0];
+    const currentBalance = userDoc.data().pitcoinBalance || 0;
+
+    if (currentBalance < parlayData.stakeAmount) {
+      throw new Error('Insufficient PitCoin balance');
+    }
+
+    // Create parlay record
+    const parlayRef = await addDoc(collection(database, 'parlays'), {
+      userId,
+      selections: parlayData.selections,
+      combinedOdds,
+      stakeAmount: parlayData.stakeAmount,
+      potentialReturn,
+      raceEvent: parlayData.raceEvent,
+      status: 'pending',
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      submissionTime: Date.now(),
+    });
+
+    // Deduct balance
+    const newBalance = currentBalance - parlayData.stakeAmount;
+    await updateDoc(userDoc.ref, {
+      pitcoinBalance: newBalance,
+      totalBets: (userDoc.data().totalBets || 0) + 1,
+      lastBetAt: serverTimestamp(),
+    });
+
+    console.log('✓ Parlay created:', parlayRef.id);
+    return { parlayId: parlayRef.id, newBalance, combinedOdds };
+  } catch (error) {
+    console.error('✗ Error creating parlay:', error);
+    throw error;
+  }
+};
+
+// Get user's active parlays
+export const getUserParlays = async (userId: string) => {
+  try {
+    const database = getDb();
+    if (!database) return [];
+
+    const parlaysQuery = query(
+      collection(database, 'parlays'),
+      where('userId', '==', userId),
+      where('status', '==', 'pending')
+    );
+    const querySnapshot = await getDocs(parlaysQuery);
+
+    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  } catch (error) {
+    console.error('✗ Error fetching parlays:', error);
+    return [];
+  }
+};

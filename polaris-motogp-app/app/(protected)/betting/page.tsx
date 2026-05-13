@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useBettingMarkets } from "@/hooks/useBettingMarkets";
 import { logBet, getUserActiveBet } from "@/lib/firestore";
 import { useState, useEffect } from "react";
+import RiderAutocomplete from "@/components/RiderAutocomplete";
 
 // Icon mapping for different bet types
 const iconMap: Record<string, any> = {
@@ -427,25 +428,25 @@ export default function BettingArena() {
                   {/* Show betting form if not locked */}
                   {!isLocked && (
                     <div className="space-y-4">
-                      {/* Prediction Input */}
+                      {/* Prediction Input with Autocomplete */}
                       <div className="relative">
-                        <input
-                          className="w-full bg-surface-container-lowest border border-outline-variant/30 rounded-lg py-3 px-4 text-on-surface focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-all"
-                          placeholder={
-                            market.betType === 'podium' ? 'e.g., Jorge Martin, Pecco Bagnaia, Marc Marquez' :
-                            market.betType === 'top5' ? 'e.g., Martin, Bagnaia, Marquez, Binder, Bastianini' :
-                            market.betType === 'fastest-lap' ? 'e.g., Jorge Martin' :
-                            market.betType === 'pole-position' ? 'e.g., Pecco Bagnaia' :
-                            'Enter your prediction...'
-                          }
-                          type="text"
+                        <RiderAutocomplete
                           value={betSelections[market.id] || ''}
-                          onChange={(e) => handleBetSelectionChange(market.id, e.target.value)}
+                          onChange={(value) => handleBetSelectionChange(market.id, value)}
+                          placeholder={
+                            market.betType === 'podium' ? 'Select top 3 riders...' :
+                            market.betType === 'top5' ? 'Select top 5 riders...' :
+                            market.betType === 'fastest-lap' ? 'Select rider...' :
+                            market.betType === 'pole-position' ? 'Select rider...' :
+                            'Select rider...'
+                          }
                           disabled={isClosed || submitting[market.id] || loadingBets}
+                          multiple={market.betType === 'podium' || market.betType === 'top5'}
+                          maxSelections={market.betType === 'podium' ? 3 : market.betType === 'top5' ? 5 : 1}
                         />
-                        <label className="absolute -top-2 left-3 bg-background px-2 text-[10px] font-mono text-outline uppercase">
-                          {market.betType === 'podium' ? 'Top 3 Riders (comma separated)' :
-                           market.betType === 'top5' ? 'Top 5 Riders (comma separated)' :
+                        <label className="absolute -top-2 left-3 bg-background px-2 text-[10px] font-mono text-outline uppercase z-10">
+                          {market.betType === 'podium' ? 'Top 3 Riders' :
+                           market.betType === 'top5' ? 'Top 5 Riders' :
                            'Your Prediction'}
                         </label>
                       </div>
